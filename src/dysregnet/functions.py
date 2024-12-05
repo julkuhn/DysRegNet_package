@@ -12,6 +12,7 @@ import joblib
 import time
 import tracemalloc
 import matplotlib.pyplot as plt
+import os
 #_____________
 
 def process_data(data):
@@ -93,6 +94,9 @@ def dyregnet_model(data):
 
         pickle_memory_usage = []
         joblib_memory_usage = []
+        edge_memory_usage = {} # get the biggest edge 
+        output_dir = "pickle_models"
+        os.makedirs(output_dir, exist_ok=True)
         #_______
         
         if data.cov_df is not None:
@@ -131,9 +135,10 @@ def dyregnet_model(data):
                         # Measure time for pickle
                         tracemalloc.start()
                         start_pickle = time.time()
-                        with open("ols_model.pkl", "wb") as file:
-                            pickle.dump(model, file)
-                        with open("ols_model.pkl", "rb") as file:
+                        pickle_filename = os.path.join(output_dir, f"{edge[0]}_{edge[1]}.pkl")  # Name based on TF and target + TODO add tissue
+                        with open(pickle_filename, "wb") as file:
+                            pickle.dump(results, file)
+                        with open(pickle_filename, "rb") as file:
                             results_pickle = pickle.load(file)
                         end_pickle = time.time()
                         current, peak = tracemalloc.get_traced_memory()
@@ -154,31 +159,14 @@ def dyregnet_model(data):
                         joblib_memory_usage.append(peak / 1024)  # Convert to KB
                         #print("Joblib takes ", end_joblib - start_joblib, "seconds")
 
-                        """# Plot the results
-                        plt.figure(figsize=(10, 6))
-
-                        # Plot time usage
-                        plt.subplot(2, 1, 1)
-                        plt.plot(average_pickle_time, label="Pickle Time", marker='o')
-                        plt.plot(average_joblib_time, label="Joblib Time", marker='o')
-                        plt.title("Serialization/Deserialization Time")
-                        plt.ylabel("Time (s)")
-                        plt.legend()
-
-                        # Plot memory usage
-                        plt.subplot(2, 1, 2)
-                        plt.plot(pickle_memory_usage, label="Pickle Memory Usage", marker='o')
-                        plt.plot(joblib_memory_usage, label="Joblib Memory Usage", marker='o')
-                        plt.title("Serialization/Deserialization Memory Usage")
-                        plt.ylabel("Memory (KB)")
-                        plt.xlabel("Iteration")
-                        plt.legend()
-
-                        plt.tight_layout()
-                        plt.show()"""
-
                     
-                        loaded_model = joblib.load("ols_model.joblib") 
+                        edge_memory_usage[edge] = pickle_memory_usage[-1]  # Memory used in the last pickle operation
+
+
+                        # load the corresponding model: # TODO in load 
+                        filename = os.path.join(output_dir, f"{edge[0]}_{edge[1]}.pkl") # TODO adapt to given files
+                        with open(filename, "rb") as file:        
+                            results = pickle.load(file)
                         # _____________________________________________
                         model_stats[edge] = [results.rsquared] + list(results.params.values) + list(results.pvalues.values)
                         
@@ -261,19 +249,29 @@ def dyregnet_model(data):
         print(f"Average Memory Usage (Pickle): {np.mean(pickle_memory_usage):.2f} KB")
         print(f"Average Memory Usage (Joblib): {np.mean(joblib_memory_usage):.2f} KB")
 
+        # Sort edges by memory usage (descending order)
+        top_5_pickle_edges = sorted(edge_memory_usage.items(), key=lambda x: x[1], reverse=True)[:5]
+
+        # Print results
+        print("Top 5 edges by pickle memory usage:")
+        for i, (edge, memory) in enumerate(top_5_pickle_edges, start=1):
+            print(f"{i}. Edge: {edge}, Memory Usage: {memory:.2f} KB")
+
 
         # Plot the memory and time usage
         plt.figure(figsize=(12, 6))
 
         # Subplot 1: Memory usage comparison
         plt.subplot(2, 1, 1)
-        plt.plot(pickle_memory_usage, label="Pickle Memory Usage (KB)", marker='o')
-        plt.plot(joblib_memory_usage, label="Joblib Memory Usage (KB)", marker='o')
-        plt.title("Memory Usage: Pickle vs Joblib")
+        plt.scatter(range(len(pickle_memory_usage)), pickle_memory_usage, label="Pickle Memory Usage (KB)", color="blue", alpha=0.7, s=10)
+        plt.scatter(range(len(joblib_memory_usage)), joblib_memory_usage, label="Joblib Memory Usage (KB)", color="green", alpha=0.7, s=10)
+        plt.title("Scatter Plot of Memory Usage: Pickle vs Joblib")
         plt.ylabel("Memory (KB)")
+        plt.xlabel("Iteration")
         plt.legend()
 
-        plt.tight_layout()
+
+        # plt.tight_layout()
         plt.show()  
         #______
                     

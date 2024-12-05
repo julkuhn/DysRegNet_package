@@ -10,6 +10,8 @@ import statsmodels.api as sm
 import pickle
 import joblib
 import time
+import tracemalloc
+import matplotlib.pyplot as plt
 #_____________
 
 def process_data(data):
@@ -88,6 +90,9 @@ def dyregnet_model(data):
         #_______
         average_pickle = []
         average_joblib = []
+
+        pickle_memory_usage = []
+        joblib_memory_usage = []
         #_______
         
         if data.cov_df is not None:
@@ -124,33 +129,56 @@ def dyregnet_model(data):
                         "start our code"
 
                         # Measure time for pickle
+                        tracemalloc.start()
                         start_pickle = time.time()
                         with open("ols_model.pkl", "wb") as file:
                             pickle.dump(model, file)
                         with open("ols_model.pkl", "rb") as file:
                             results_pickle = pickle.load(file)
                         end_pickle = time.time()
+                        current, peak = tracemalloc.get_traced_memory()
+                        tracemalloc.stop()
                         average_pickle.append(end_pickle - start_pickle)
+                        pickle_memory_usage.append(peak / 1024)  # Convert to KB
                         #print("Pickle takes ", end_pickle - start_pickle, "seconds")
 
                         # Measure time for joblib
+                        tracemalloc.start()
                         start_joblib = time.time()
                         joblib.dump(model, "ols_model.joblib")
                         results_joblib = joblib.load("ols_model.joblib")
                         end_joblib = time.time()
                         average_joblib.append(end_joblib - start_joblib)
-
+                        current, peak = tracemalloc.get_traced_memory()
+                        tracemalloc.stop()
+                        joblib_memory_usage.append(peak / 1024)  # Convert to KB
                         #print("Joblib takes ", end_joblib - start_joblib, "seconds")
 
-                    
-                        # Load the model 
-                        loaded_model = joblib.load("ols_model.joblib") 
-                        # Access model parameters 
-                        #print("Coefficients:", loaded_model.params) 
-                        #print("R-squared:", loaded_model.rsquared)
+                        """# Plot the results
+                        plt.figure(figsize=(10, 6))
 
-                        #results = results_pickle.params
-                        #results = results_joblib.params
+                        # Plot time usage
+                        plt.subplot(2, 1, 1)
+                        plt.plot(average_pickle_time, label="Pickle Time", marker='o')
+                        plt.plot(average_joblib_time, label="Joblib Time", marker='o')
+                        plt.title("Serialization/Deserialization Time")
+                        plt.ylabel("Time (s)")
+                        plt.legend()
+
+                        # Plot memory usage
+                        plt.subplot(2, 1, 2)
+                        plt.plot(pickle_memory_usage, label="Pickle Memory Usage", marker='o')
+                        plt.plot(joblib_memory_usage, label="Joblib Memory Usage", marker='o')
+                        plt.title("Serialization/Deserialization Memory Usage")
+                        plt.ylabel("Memory (KB)")
+                        plt.xlabel("Iteration")
+                        plt.legend()
+
+                        plt.tight_layout()
+                        plt.show()"""
+
+                    
+                        loaded_model = joblib.load("ols_model.joblib") 
                         # _____________________________________________
                         model_stats[edge] = [results.rsquared] + list(results.params.values) + list(results.pvalues.values)
                         
@@ -230,7 +258,23 @@ def dyregnet_model(data):
         #______
         print("Average pickle: ", np.average(average_pickle))
         print("Average joblib: ", np.average(average_joblib))
+        print(f"Average Memory Usage (Pickle): {np.mean(pickle_memory_usage):.2f} KB")
+        print(f"Average Memory Usage (Joblib): {np.mean(joblib_memory_usage):.2f} KB")
 
+
+        # Plot the memory and time usage
+        plt.figure(figsize=(12, 6))
+
+        # Subplot 1: Memory usage comparison
+        plt.subplot(2, 1, 1)
+        plt.plot(pickle_memory_usage, label="Pickle Memory Usage (KB)", marker='o')
+        plt.plot(joblib_memory_usage, label="Joblib Memory Usage (KB)", marker='o')
+        plt.title("Memory Usage: Pickle vs Joblib")
+        plt.ylabel("Memory (KB)")
+        plt.legend()
+
+        plt.tight_layout()
+        plt.show()  
         #______
                     
         results = pd.DataFrame.from_dict(edges)

@@ -1,0 +1,10 @@
+name: sysbiomed_project
+channels:
+- conda-forge
+- bioconda
+- nodefaults
+dependencies:
+- python =3.11
+- jupyterlab
+- pip
+

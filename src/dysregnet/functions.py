@@ -161,12 +161,6 @@ def dyregnet_model(data):
 
                     
                         edge_memory_usage[edge] = pickle_memory_usage[-1]  # Memory used in the last pickle operation
-
-
-                        # load the corresponding model: # TODO in load 
-                        filename = os.path.join(output_dir, f"{edge[0]}_{edge[1]}.pkl") # TODO adapt to given files
-                        with open(filename, "rb") as file:        
-                            results = pickle.load(file)
                         # _____________________________________________
                         model_stats[edge] = [results.rsquared] + list(results.params.values) + list(results.pvalues.values)
                         

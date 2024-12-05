@@ -124,14 +124,15 @@ def dyregnet_model(data):
                         "start our code"
 
                     
-                        # Load the model 
-                        loaded_model = joblib.load("ols_model.joblib") 
+                       
+                        # load the corresponding model: # TODO in load 
+                        filename = os.path.join(output_dir, f"{edge[0]}_{edge[1]}.pkl") # TODO adapt to given files
+                        with open(filename, "rb") as file:        
+                            results = pickle.load(file)
                         # Access model parameters 
-                        print("Coefficients:", loaded_model.params) 
-                        print("R-squared:", loaded_model.rsquared)
+                        print("Coefficients:", results.params) 
+                        print("R-squared:", results.rsquared)
 
-                        #results = results_pickle.params
-                        #results = results_joblib.params
                         # _____________________________________________
                         model_stats[edge] = [results.rsquared] + list(results.params.values) + list(results.pvalues.values)
                         

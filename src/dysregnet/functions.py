@@ -123,31 +123,12 @@ def dyregnet_model(data):
                         # __________________________________________Save the model
                         "start our code"
 
-                        # Measure time for pickle
-                        start_pickle = time.time()
-                        with open("ols_model.pkl", "wb") as file:
-                            pickle.dump(model, file)
-                        with open("ols_model.pkl", "rb") as file:
-                            results_pickle = pickle.load(file)
-                        end_pickle = time.time()
-                        average_pickle.append(end_pickle - start_pickle)
-                        #print("Pickle takes ", end_pickle - start_pickle, "seconds")
-
-                        # Measure time for joblib
-                        start_joblib = time.time()
-                        joblib.dump(model, "ols_model.joblib")
-                        results_joblib = joblib.load("ols_model.joblib")
-                        end_joblib = time.time()
-                        average_joblib.append(end_joblib - start_joblib)
-
-                        #print("Joblib takes ", end_joblib - start_joblib, "seconds")
-
                     
                         # Load the model 
                         loaded_model = joblib.load("ols_model.joblib") 
                         # Access model parameters 
-                        #print("Coefficients:", loaded_model.params) 
-                        #print("R-squared:", loaded_model.rsquared)
+                        print("Coefficients:", loaded_model.params) 
+                        print("R-squared:", loaded_model.rsquared)
 
                         #results = results_pickle.params
                         #results = results_joblib.params

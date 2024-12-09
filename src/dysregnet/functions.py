@@ -238,35 +238,25 @@ def dyregnet_model(data):
                         edges[edge] = np.round(zscore, 1)
 
         #______
-        print("Average pickle: ", np.average(average_pickle))
-        print("Average joblib: ", np.average(average_joblib))
-        print(f"Average Memory Usage (Pickle): {np.mean(pickle_memory_usage):.2f} KB")
-        print(f"Average Memory Usage (Joblib): {np.mean(joblib_memory_usage):.2f} KB")
-
-        # Sort edges by memory usage (descending order)
-        top_5_pickle_edges = sorted(edge_memory_usage.items(), key=lambda x: x[1], reverse=True)[:5]
-
-        # Print results
-        print("Top 5 edges by pickle memory usage:")
-        for i, (edge, memory) in enumerate(top_5_pickle_edges, start=1):
-            print(f"{i}. Edge: {edge}, Memory Usage: {memory:.2f} KB")
-
-
-        # Plot the memory and time usage
-        plt.figure(figsize=(12, 6))
-
-        # Subplot 1: Memory usage comparison
-        plt.subplot(2, 1, 1)
-        plt.scatter(range(len(pickle_memory_usage)), pickle_memory_usage, label="Pickle Memory Usage (KB)", color="blue", alpha=0.7, s=10)
-        plt.scatter(range(len(joblib_memory_usage)), joblib_memory_usage, label="Joblib Memory Usage (KB)", color="green", alpha=0.7, s=10)
-        plt.title("Scatter Plot of Memory Usage: Pickle vs Joblib")
-        plt.ylabel("Memory (KB)")
-        plt.xlabel("Iteration")
-        plt.legend()
-
-
-        # plt.tight_layout()
-        plt.show()  
+        # save results for evaluation
+        with open("memory_time_usage.txt", "w") as f:
+            f.write(f"Average pickle: {np.average(average_pickle)}\n")
+            f.write(f"Average joblib: {np.average(average_joblib)}\n")
+            f.write(f"Average Memory Usage (Pickle): {np.mean(pickle_memory_usage):.2f} KB\n")
+            f.write(f"Average Memory Usage (Joblib): {np.mean(joblib_memory_usage):.2f} KB\n")
+            
+            # Save top 5 edges by memory usage
+            top_5_pickle_edges = sorted(edge_memory_usage.items(), key=lambda x: x[1], reverse=True)[:5]
+            f.write("Top 5 edges by pickle memory usage:\n")
+            for edge, memory in top_5_pickle_edges:
+                f.write(f"Edge: {edge}, Memory Usage: {memory:.2f} KB\n")
+            
+            # Save individual memory usage data
+            f.write("Pickle Memory Usage (KB):\n")
+            f.write(",".join(map(str, pickle_memory_usage)) + "\n")
+            
+            f.write("Joblib Memory Usage (KB):\n")
+            f.write(",".join(map(str, joblib_memory_usage)) + "\n")
         #______
                     
         results = pd.DataFrame.from_dict(edges)

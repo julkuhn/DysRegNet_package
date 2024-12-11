@@ -10,6 +10,7 @@ import statsmodels.api as sm
 import pickle
 import joblib
 import time
+import os
 #_____________
 
 def process_data(data):
@@ -86,140 +87,78 @@ def dyregnet_model(data):
         # prepare data
         
         #_______
-        average_pickle = []
-        average_joblib = []
+        output_dir = "/Users/juliakuhn/Desktop/uni/WS2425/Systems_BioMedicine/Project_Phase/pickle_models/" # TODO adapt to given files
         #_______
         
+        # Prepare case data
         if data.cov_df is not None:
-            control=pd.merge(data.cov_df.loc[data.control],data.expr, left_index=True, right_index=True).drop_duplicates()
-            case=pd.merge(data.cov_df.loc[data.case],data.expr, left_index=True, right_index=True).drop_duplicates()
-            covariate_name= list(data.cov_df.columns)
-        
+            case = pd.merge(data.cov_df.loc[data.case], data.expr, left_index=True, right_index=True).drop_duplicates()
+            covariate_name = list(data.cov_df.columns)
         else:
-            control=data.expr.loc[data.control]
-            case=data.expr.loc[data.case]
-            covariate_name=[]
-            
+            case = data.expr.loc[data.case]
+            covariate_name = []
+
         edges = {}
-        edges['patient id']=list(case.index.values)
+        edges['patient id'] = list(case.index.values)
         model_stats = {}
-        for tup in tqdm(data.GRN.itertuples()):
-                    # pvalues for the same edge for all patients
 
-                    edge = (tup[1],tup[2])
-                    
-                    # skip self loops
-                    if edge[0] != edge[1]:
+        for tup in tqdm(data.GRN.itertuples(), desc="Processing edges"):
+            edge = (tup[1], tup[2])  # Extract TF → target pair
 
-                        # prepare control for fitting model
-                        x_train = control[  [edge[0]] + covariate_name ]
-                        x_train = sm.add_constant(x_train, has_constant='add') # add bias
-                        y_train = control[edge[1]].values
+            # Skip self-loops
+            if edge[0] == edge[1]:
+                continue
 
-                        # fit the model
-                        model = sm.OLS(y_train, x_train)
-                        results = model.fit() # TODO interessant
+            # Prepare design matrix for case samples
+            x_test = case[[edge[0]] + covariate_name]
+            x_test = sm.add_constant(x_test, has_constant='add')  # Add intercept
+            y_test = case[edge[1]].values
 
-                        # __________________________________________Save the model
-                        "start our code"
+            # Load pre-trained model
+            filename = os.path.join(output_dir, f"{edge[0]}_{edge[1]}.pkl")
+            try:
+                with open(filename, "rb") as file:
+                    results = pickle.load(file)
+            except FileNotFoundError:
+                print(f"Model file not found for edge {edge}. Skipping.")
+                continue
 
-                    
-                       
-                        # load the corresponding model: # TODO in load 
-                        filename = os.path.join(output_dir, f"{edge[0]}_{edge[1]}.pkl") # TODO adapt to given files
-                        with open(filename, "rb") as file:        
-                            results = pickle.load(file)
-                        # Access model parameters 
-                        print("Coefficients:", results.params) 
-                        print("R-squared:", results.rsquared)
+            # Save model stats
+            model_stats[edge] = [results.rsquared] + list(results.params.values) + list(results.pvalues.values)
 
-                        # _____________________________________________
-                        model_stats[edge] = [results.rsquared] + list(results.params.values) + list(results.pvalues.values)
-                        
-                        # get residuals of control
-                        resid_control = y_train - results.predict(x_train) 
+            # Predict target gene expression for case samples
+            y_pred = results.predict(x_test)
 
-                        # test data (case or condition)
-                        x_test = case[  [edge[0]]+ covariate_name    ]
-                        x_test = sm.add_constant(x_test, has_constant='add') # add bias
-                        y_test = case[edge[1]].values
+            # Residuals for case samples
+            resid_case = y_test - y_pred
 
+            # Directional condition (if applicable)
+            cond = True
+            direction = np.sign(results.params.iloc[1])  # Direction of TF influence
+            sides = 2  # Default: two-sided p-value
+            if data.direction_condition:
+                cond = (direction * resid_case) < 0
+                sides = 1  # One-sided p-value
 
-                        # define residue for cases
-                        resid_case =  y_test - results.predict(x_test)
+            # Z-score calculation (assuming a standard normal distribution for residuals)
+            zscore = resid_case / resid_case.std()
 
-                        
-                        # condition of direction
-                        cond = True
-                        direction = np.sign(results.params.iloc[1])
-                        
-                        
-                        # two sided p_value as default
-                        # if direction_condition is false calculate, two sided p value
-                        sides = 2
+            # Convert z-scores to p-values and apply multiple testing correction
+            pvalues = stats.norm.sf(abs(zscore)) * sides
+            pvalues = sm.stats.multipletests(pvalues, method='bonferroni', alpha=data.bonferroni_alpha)[1]
+            valid = cond * (pvalues < data.bonferroni_alpha)
 
-                        if data.direction_condition: 
-                            cond = ( direction * resid_case ) < 0
-                            
-                            # if direction_condition is true only calculate one sided p value
-                            sides = 1
+            # Filter insignificant z-scores
+            zscore[~valid] = 0.0
+            edges[edge] = np.round(zscore, 1)
 
-                        
-                        # calculate zscore
-                        zscore= (resid_case - resid_control.mean()) / resid_control.std()
-      
-
-
-                        # Quality check of the fitness (optionally and must be provided by user)
-
-
-                        if (data.R2_threshold is not None) and  ( data.R2_threshold > results.rsquared ):
-                            # model fit is not that good on training
-                            # shrink the zscores
-                            edges[edge]= [0.0] * len(zscore)
-                            continue
-
-                        #normality test for residuals
-                        if  data.normaltest:
-                            pv = stats.normaltest(resid_control)[1]
-                            if pv> data.normaltest_alpha:
-                                # shrink the zscores to 0s
-                                edges[edge]= [0.0] * len(zscore)
-                                continue
-
-
-                        # zscores to p values
-                        pvalues=stats.norm.sf(abs(zscore)) * sides
-
-                        # correct for multi. testing
-                        pvalues=sm.stats.multipletests(pvalues,method='bonferroni',alpha=data.bonferroni_alpha)[1]
-
-                        pvalues= pvalues < data.bonferroni_alpha
-
-
-
-                        # direction condition and a p_value 
-                        valid= cond * pvalues
-
-
-
-                        # shrink the z scores that are not signifcant or not in the condition
-                        zscore[~valid]=0.0
-
-
-                        edges[edge] = np.round(zscore, 1)
-
-        #______
-        print("Average pickle: ", np.average(average_pickle))
-        print("Average joblib: ", np.average(average_joblib))
-
-        #______
-                    
+        # Convert results to DataFrame
         results = pd.DataFrame.from_dict(edges)
         results = results.set_index('patient id')
-        
-        model_stats_cols = ["R2"] + ["coef_" + coef for coef in ["intercept", "TF"] + covariate_name] + ["pval_" + coef for coef in ["intercept", "TF"] + covariate_name]
+
+        # Model stats DataFrame
+        model_stats_cols = ["R2"] + ["coef_" + coef for coef in ["intercept", "TF"] + covariate_name] + \
+                        ["pval_" + coef for coef in ["intercept", "TF"] + covariate_name]
         model_stats = pd.DataFrame([model_stats[edge] for edge in results.columns], index=results.columns, columns=model_stats_cols)
 
-        
         return results, model_stats

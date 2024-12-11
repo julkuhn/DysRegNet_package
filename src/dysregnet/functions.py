@@ -95,6 +95,7 @@ def dyregnet_model(data):
         pickle_memory_usage = []
         joblib_memory_usage = []
         edge_memory_usage = {} # get the biggest edge 
+        edgej_memory_usage = {} # get the biggest edge
         output_dir = "pickle_models"
         os.makedirs(output_dir, exist_ok=True)
         #_______
@@ -161,6 +162,7 @@ def dyregnet_model(data):
 
                     
                         edge_memory_usage[edge] = pickle_memory_usage[-1]  # Memory used in the last pickle operation
+                        edgej_memory_usage[edge] = joblib_memory_usage[-1]  # Memory used in the last pickle operation
                         # _____________________________________________
                         model_stats[edge] = [results.rsquared] + list(results.params.values) + list(results.pvalues.values)
                         
@@ -249,6 +251,11 @@ def dyregnet_model(data):
             top_5_pickle_edges = sorted(edge_memory_usage.items(), key=lambda x: x[1], reverse=True)[:5]
             f.write("Top 5 edges by pickle memory usage:\n")
             for edge, memory in top_5_pickle_edges:
+                f.write(f"Edge: {edge}, Memory Usage: {memory:.2f} KB\n")
+
+            top_5_joblib_edges = sorted(edgej_memory_usage.items(), key=lambda x: x[1], reverse=True)[:5]
+            f.write("Top 5 edges by joblib memory usage:\n")
+            for edge, memory in top_5_joblib_edges:
                 f.write(f"Edge: {edge}, Memory Usage: {memory:.2f} KB\n")
             
             # Save individual memory usage data

@@ -89,13 +89,9 @@ def dyregnet_model(data):
         # prepare data
         
         #_______
-        average_pickle = []
-        average_joblib = []
-
-        pickle_memory_usage = []
-        joblib_memory_usage = []
-        edge_memory_usage = {} # get the biggest edge 
-        edgej_memory_usage = {} # get the biggest edge
+        eval_data = {"runtime": {"pickle":[], "joblib": []},
+                 "memory_usage": {"pickle":[], "joblib": []}}
+        
         output_dir = "pickle_models"
         os.makedirs(output_dir, exist_ok=True)
         #_______
@@ -130,39 +126,40 @@ def dyregnet_model(data):
                         model = sm.OLS(y_train, x_train)
                         results = model.fit() # TODO interessant
 
-                        # __________________________________________Save the model
-                        "start our code"
+                        # __________________________________________
+                        # Saving the model
 
-                        # Measure time for pickle
+                        # Measure time and memory usage for pickle
                         tracemalloc.start()
                         start_pickle = time.time()
+
                         pickle_filename = os.path.join(output_dir, f"{edge[0]}_{edge[1]}.pkl")  # Name based on TF and target + TODO add tissue
                         with open(pickle_filename, "wb") as file:
                             pickle.dump(results, file)
                         with open(pickle_filename, "rb") as file:
                             results_pickle = pickle.load(file)
-                        end_pickle = time.time()
-                        current, peak = tracemalloc.get_traced_memory()
-                        tracemalloc.stop()
-                        average_pickle.append(end_pickle - start_pickle)
-                        pickle_memory_usage.append(peak / 1024)  # Convert to KB
-                        #print("Pickle takes ", end_pickle - start_pickle, "seconds")
 
-                        # Measure time for joblib
+                        end_pickle = time.time()
+                        _ , peak_pickle = tracemalloc.get_traced_memory()
+                        tracemalloc.stop()
+
+                        eval_data["memory_usage"]["pickle"].append((edge, peak_pickle / 1024)) # Convert to KB
+                        eval_data["runtime"]["pickle"].append((edge, (end_pickle - start_pickle)* 1000)) # Convert to ms
+
+                        # Measure time and memory usage for joblib
                         tracemalloc.start()
                         start_joblib = time.time()
                         joblib.dump(model, "ols_model.joblib")
                         results_joblib = joblib.load("ols_model.joblib")
                         end_joblib = time.time()
-                        average_joblib.append(end_joblib - start_joblib)
-                        current, peak = tracemalloc.get_traced_memory()
+                        _ , peak_joblib = tracemalloc.get_traced_memory()
                         tracemalloc.stop()
-                        joblib_memory_usage.append(peak / 1024)  # Convert to KB
-                        #print("Joblib takes ", end_joblib - start_joblib, "seconds")
 
-                    
-                        edge_memory_usage[edge] = pickle_memory_usage[-1]  # Memory used in the last pickle operation
-                        edgej_memory_usage[edge] = joblib_memory_usage[-1]  # Memory used in the last pickle operation
+                        eval_data["memory_usage"]["joblib"].append((edge, peak_joblib / 1024)) # Convert to KB
+                        eval_data["runtime"]["joblib"].append((edge, (end_joblib - start_joblib)* 1000)) # Convert to ms
+                                               
+                        os.remove("ols_model.joblib") # The method joblib is not efficient and will not be used
+
                         # _____________________________________________
                         model_stats[edge] = [results.rsquared] + list(results.params.values) + list(results.pvalues.values)
                         
@@ -241,29 +238,11 @@ def dyregnet_model(data):
 
         #______
         # save results for evaluation
-        with open("memory_time_usage.txt", "w") as f:
-            f.write(f"Average pickle: {np.average(average_pickle)}\n")
-            f.write(f"Average joblib: {np.average(average_joblib)}\n")
-            f.write(f"Average Memory Usage (Pickle): {np.mean(pickle_memory_usage):.2f} KB\n")
-            f.write(f"Average Memory Usage (Joblib): {np.mean(joblib_memory_usage):.2f} KB\n")
-            
-            # Save top 5 edges by memory usage
-            top_5_pickle_edges = sorted(edge_memory_usage.items(), key=lambda x: x[1], reverse=True)[:5]
-            f.write("Top 5 edges by pickle memory usage:\n")
-            for edge, memory in top_5_pickle_edges:
-                f.write(f"Edge: {edge}, Memory Usage: {memory:.2f} KB\n")
-
-            top_5_joblib_edges = sorted(edgej_memory_usage.items(), key=lambda x: x[1], reverse=True)[:5]
-            f.write("Top 5 edges by joblib memory usage:\n")
-            for edge, memory in top_5_joblib_edges:
-                f.write(f"Edge: {edge}, Memory Usage: {memory:.2f} KB\n")
-            
-            # Save individual memory usage data
-            f.write("Pickle Memory Usage (KB):\n")
-            f.write(",".join(map(str, pickle_memory_usage)) + "\n")
-            
-            f.write("Joblib Memory Usage (KB):\n")
-            f.write(",".join(map(str, joblib_memory_usage)) + "\n")
+        folder_eval = "eval"
+        os.makedirs(folder_eval, exist_ok=True)
+        eval_data_path = os.path.join(folder_eval, "eval_data_exercise.pickle")
+        with open(eval_data_path, 'wb') as handle:
+            pickle.dump(eval_data, handle)
         #______
                     
         results = pd.DataFrame.from_dict(edges)

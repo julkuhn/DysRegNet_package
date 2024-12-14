@@ -1,7 +1,7 @@
 
 import pandas as pd
 
-from . import functions 
+from . import functions
 
 
 

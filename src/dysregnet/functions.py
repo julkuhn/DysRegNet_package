@@ -15,7 +15,7 @@ import os
 
 def process_data(data):
        
-
+        
         # process covariates and design matrix
         
         all_covariates = data.CatCov + data.ConCov
@@ -92,15 +92,18 @@ def dyregnet_model(data):
         
         # Prepare case data
         if data.cov_df is not None:
+            control=pd.merge(data.cov_df.loc[data.control],data.expr, left_index=True, right_index=True).drop_duplicates()
             case = pd.merge(data.cov_df.loc[data.case], data.expr, left_index=True, right_index=True).drop_duplicates()
             covariate_name = list(data.cov_df.columns)
         else:
+            control=data.expr.loc[data.control]
             case = data.expr.loc[data.case]
             covariate_name = []
-
+            
         edges = {}
-        edges['patient id'] = list(case.index.values)
+        edges['patient id']=list(case.index.values)
         model_stats = {}
+                         
 
         for tup in tqdm(data.GRN.itertuples(), desc="Processing edges"):
             edge = (tup[1], tup[2])  # Extract TF → target pair
@@ -114,14 +117,29 @@ def dyregnet_model(data):
             x_test = sm.add_constant(x_test, has_constant='add')  # Add intercept
             y_test = case[edge[1]].values
 
-            # Load pre-trained model
-            filename = os.path.join(output_dir, f"{edge[0]}_{edge[1]}.pkl")
-            try:
-                with open(filename, "rb") as file:
-                    results = pickle.load(file)
-            except FileNotFoundError:
-                print(f"Model file not found for edge {edge}. Skipping.")
-                continue
+            # check if no control samples >3
+            if len(control) < 3:
+                # check if trained models fit control data, use only these and ignore others
+                print('Only 3 control samples, using only these for the model')
+                # prepare control for fitting model TODO correct?
+                x_train = control[  [edge[0]] + covariate_name ]
+                x_train = sm.add_constant(x_train, has_constant='add') # add bias
+                y_train = control[edge[1]].values
+
+                # fit the model
+                model = sm.OLS(y_train, x_train)
+                results = model.fit() # TODO interessant
+
+
+            else:
+                # Load pre-trained model
+                filename = os.path.join(output_dir, f"{edge[0]}_{edge[1]}.pkl")
+                try:
+                    with open(filename, "rb") as file:
+                        results = pickle.load(file)
+                except FileNotFoundError:
+                    print(f"Model file not found for edge {edge}. Skipping.")
+                    continue
 
             # Save model stats
             model_stats[edge] = [results.rsquared] + list(results.params.values) + list(results.pvalues.values)

@@ -94,49 +94,63 @@ class run(object):
                     # quality check of parameters
 
                     # set sample as indexes
-                    meta = meta.set_index(meta.columns[0])
-                    expression_data = expression_data.set_index(expression_data.columns[0])
+                    if meta is not None:
+                        meta = meta.set_index(meta.columns[0])
+                        expression_data = expression_data.set_index(expression_data.columns[0])
 
 
-                    # check sample ids
-                    samples=[ s for s in  list(meta.index) if s in list(expression_data.index) ]
-                    if not samples:
-                          raise ValueError("Sample columns are not found or the ids don't match. Please make sure that the first column in 'expression_data' and 'meta' are both sample ids.")
+                        # check sample ids
+                        samples=[ s for s in  list(meta.index) if s in list(expression_data.index) ]
+                        if not samples:
+                            raise ValueError("Sample columns are not found or the ids don't match. Please make sure that the first column in 'expression_data' and 'meta' are both sample ids.")
 
-                    self.meta=meta.loc[samples]
-                    self.expression_data=expression_data.loc[samples]
-
-
-
-                    #check condition column
-                    if self.conCol not in self.meta.columns:
-                            raise ValueError(" Invalid conCol value. Could not find the column '%s' in meta DataFrame" % self.conCol)
-
-                    if set(self.meta[conCol].unique())!={0,1}:
-                            raise ValueError(" Invalid values in '%s' column in meta DataFrame. Please make sure to have condition column in the meta DataFrame with 0 as control and 1 as the condition (int)." % self.conCol)
-
-                    # split sample ids (cases and control)
-                    self.control= list( self.meta[self.meta[conCol]==0].index )
-                    self.case= list( self.meta[self.meta[conCol]==1].index )
+                        self.meta=meta.loc[samples]
+                        self.expression_data=expression_data.loc[samples]
 
 
+                        #check condition column
+                        if self.conCol not in self.meta.columns:
+                                raise ValueError(" Invalid conCol value. Could not find the column '%s' in meta DataFrame" % self.conCol)
 
-                    # check GRN and gene ids
+                        if set(self.meta[conCol].unique())!={0,1}:
+                                raise ValueError(" Invalid values in '%s' column in meta DataFrame. Please make sure to have condition column in the meta DataFrame with 0 as control and 1 as the condition (int)." % self.conCol)
 
-                    GRN_genes=list(set(GRN.iloc[:,0].values.tolist() + GRN.iloc[:,1].values.tolist()))
-                    GRN_genes=[g for g in GRN_genes if g in expression_data.columns]
+                        # split sample ids (cases and control)
+                        self.control= list( self.meta[self.meta[conCol]==0].index )
+                        self.case= list( self.meta[self.meta[conCol]==1].index )
 
-                    if not GRN_genes:
-                         raise ValueError('Gene id or name in GRN DataFrame do not match the ones in expression_data DataFrame')
+                    
+                     #___________________________________________
+                    """- GRN param → file or not, not: check if string → tissue → load model
+                        - no confounder can be provided → what happens?
+                        - simple version: not allowed to include meta, only case no confounderes → no need for meta file
+                        - TODO feautre if only 3 control samples, provide and check if trained models fit control data, use only these and ignore others
+                        - still allowed control samples → just to verify not to train with them 
+                    """
 
-                    self.expression_data=self.expression_data[GRN_genes]
-                    self.GRN=GRN[GRN.iloc[:,0].isin(GRN_genes) ]
-                    self.GRN=self.GRN[ self.GRN.iloc[:,1].isin(GRN_genes) ].drop_duplicates()
+                    if type(GRN) == str:
+                        if GRN.endswith('.csv'): 
+                            GRN = pd.read_csv(GRN)# load GRN file
+                            # check GRN and gene ids
+                            GRN_genes=list(set(GRN.iloc[:,0].values.tolist() + GRN.iloc[:,1].values.tolist()))
+                            GRN_genes=[g for g in GRN_genes if g in expression_data.columns]
 
+                            if not GRN_genes:
+                                raise ValueError('Gene id or name in GRN DataFrame do not match the ones in expression_data DataFrame')
+
+                            self.expression_data=self.expression_data[GRN_genes]
+                            self.GRN=GRN[GRN.iloc[:,0].isin(GRN_genes) ]
+                            self.GRN=self.GRN[ self.GRN.iloc[:,1].isin(GRN_genes) ].drop_duplicates()
+
+                        elif GRN == 'lung': # TODO hier auch checken, ob die ids matchen?
+                            # load model
+                            self.model = "lung_model" # TODO adapt to given files, insert here file path for the corresponding model
+                        elif GRN == 'breat':
+                            # load model
+                            self.model = "breast_model"
+                    #___________________________________________
 
                     self.cov_df,self.expr, self.control, self.case = functions.process_data(self)
-
-
                     self.results, self.model_stats = functions.dyregnet_model(self)
                 
 

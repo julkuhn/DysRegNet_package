@@ -22,7 +22,7 @@ def process_data(data):
         
         all_covariates = data.CatCov + data.ConCov
 
-        if not all_covariates or len(data.meta)==1:
+        """if not all_covariates or len(data.meta)==1:
 
                 # No covariate provided
                 print('You did not input any covariates in CatCov or ConCov parameters, proceeding without them.')
@@ -39,7 +39,7 @@ def process_data(data):
 
                 # process categorial covariate
                 # drop_first is important to avoid multicollinear
-                cov_df = pd.get_dummies(cov_df, columns=data.CatCov, drop_first=True, dtype=int)
+                cov_df = pd.get_dummies(cov_df, columns=data.CatCov, drop_first=True, dtype=int)"""
                 
                 
                 

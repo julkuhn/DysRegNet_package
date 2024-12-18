@@ -105,8 +105,9 @@ def dyregnet_model(data):
         model_stats = {}
                          
 
-        for tup in tqdm(data.GRN.itertuples(), desc="Processing edges"):
-            edge = (tup[1], tup[2])  # Extract TF → target pair
+        for tup in tqdm(data.GRN.itertuples(), desc="Processing edges"): # TODO hier genes von expr matrix nehmen
+        for gene in genes # TODO
+            edge = (tup[1], tup[2])  # Extract TF → target pair 
 
             # Skip self-loops
             if edge[0] == edge[1]:

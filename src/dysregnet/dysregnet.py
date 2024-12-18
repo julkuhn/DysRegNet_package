@@ -128,9 +128,22 @@ class run(object):
                         - still allowed control samples → just to verify not to train with them 
                     """
 
+                    print(type(GRN))
+
                     if type(GRN) == str:
-                        if GRN.endswith('.csv'): 
-                            GRN = pd.read_csv(GRN)# load GRN file
+                        
+
+                        if GRN == 'lung': # TODO hier auch checken, ob die ids matchen?
+                            # load model
+                            self.model = "lung_model" # TODO adapt to given files, insert here file path for the corresponding model
+                            # TODO grn genes etC? 
+                        elif GRN == 'breat':
+                            # load model
+                            self.model = "breast_model"
+                        else:
+                            raise ValueError("Invalid GRN value. Please provide a valid GRN file or a tissue name.")
+                        
+                    elif type(GRN) == pd.DataFrame:
                             # check GRN and gene ids
                             GRN_genes=list(set(GRN.iloc[:,0].values.tolist() + GRN.iloc[:,1].values.tolist()))
                             GRN_genes=[g for g in GRN_genes if g in expression_data.columns]
@@ -141,13 +154,6 @@ class run(object):
                             self.expression_data=self.expression_data[GRN_genes]
                             self.GRN=GRN[GRN.iloc[:,0].isin(GRN_genes) ]
                             self.GRN=self.GRN[ self.GRN.iloc[:,1].isin(GRN_genes) ].drop_duplicates()
-
-                        elif GRN == 'lung': # TODO hier auch checken, ob die ids matchen?
-                            # load model
-                            self.model = "lung_model" # TODO adapt to given files, insert here file path for the corresponding model
-                        elif GRN == 'breat':
-                            # load model
-                            self.model = "breast_model"
                     #___________________________________________
 
                     self.cov_df,self.expr, self.control, self.case = functions.process_data(self)

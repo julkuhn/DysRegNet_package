@@ -20,7 +20,8 @@ def process_data(data):
 
         # process covariates and design matrix
         
-        all_covariates = data.CatCov + data.ConCov
+        #all_covariates = data.CatCov + data.ConCov
+        pass
 
         """if not all_covariates or len(data.meta)==1:
 
@@ -44,7 +45,7 @@ def process_data(data):
                 
                 
         # z scoring
-        if data.zscoring:
+        """if data.zscoring:
 
             # expression data
             # fit a scaler base on the control samples
@@ -74,7 +75,7 @@ def process_data(data):
         
         #get control and case sample 
         control = data.meta[ data.meta[data.conCol]==0 ].index.values.tolist()
-        case = data.meta[ data.meta[data.conCol]==1 ].index.values.tolist()
+        case = data.meta[ data.meta[data.conCol]==1 ].index.values.tolist()"""
 
         return cov_df, expr, control, case
     
@@ -298,7 +299,7 @@ def dyregnet_model(data):
     for tup in tqdm(data.GRN.itertuples(), desc="Training models for edges"):
         edge = (tup[1], tup[2])  # Extract TF → target pair
 
-        print(f"Training model for edge {edge}")
+        #print(f"Training model for edge {edge}")
 
         # Skip self-loops
         if edge[0] == edge[1]:
@@ -346,6 +347,8 @@ def dyregnet_model(data):
 
     # Convert model statistics to a DataFrame
     model_stats_df = pd.DataFrame.from_dict(model_stats, orient='index')
+
+    
 
     return model_stats_df
 

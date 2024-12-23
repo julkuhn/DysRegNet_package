@@ -162,6 +162,7 @@ class run(object):
                     self.GRN=self.GRN[ self.GRN.iloc[:,1].isin(GRN_genes) ].drop_duplicates()
 
                     #self.cov_df,self.expr, self.control, self.case = functions.process_data(self)
+                    #self.cov_df,self.expr = functions.process_data(self)
 
 
                     #self.results, self.model_stats = functions.dyregnet_model_old(self)

@@ -80,7 +80,7 @@ def process_data(data):
     
     
     
-def dyregnet_model(data):
+def dyregnet_model_old(data):
         
         # Fit a model for every edge
         # Detect outliers and calculate zscore and pvalues
@@ -96,7 +96,7 @@ def dyregnet_model(data):
         joblib_memory_usage = []
         edge_memory_usage = {} # get the biggest edge 
         edgej_memory_usage = {} # get the biggest edge
-        output_dir = "pickle_models"
+        output_dir = "models/breast"
         os.makedirs(output_dir, exist_ok=True)
         #_______
         
@@ -274,3 +274,79 @@ def dyregnet_model(data):
 
         
         return results, model_stats
+
+
+def dyregnet_model(data):
+    """
+    Train models based on the expected (healthy) dataset and save the trained models.
+    """
+    # Directory to save models
+    output_dir = "models/breast"
+    os.makedirs(output_dir, exist_ok=True)
+
+    # Data preparation: Use the whole dataset
+    full_data = data.expression_data
+    if full_data.empty:
+        print("The expr DataFrame is empty!")
+        return pd.DataFrame()  # Return an empty DataFrame if no data is present
+
+    covariate_name = list(data.cov_df.columns) if hasattr(data, 'cov_df') and data.cov_df is not None else []
+
+    # Dictionary to store model statistics
+    model_stats = {}
+
+    for tup in tqdm(data.GRN.itertuples(), desc="Training models for edges"):
+        edge = (tup[1], tup[2])  # Extract TF → target pair
+
+        print(f"Training model for edge {edge}")
+
+        # Skip self-loops
+        if edge[0] == edge[1]:
+            continue
+
+        # Ensure genes exist in the expression data
+        if edge[0] not in full_data.columns or edge[1] not in full_data.columns:
+            print(f"Skipping edge {edge}: Genes not found in expression data.")
+            continue
+
+        # Prepare x_train and y_train
+        x_train = full_data[[edge[0]] + covariate_name]  # Predictor variables
+        y_train = full_data[edge[1]]  # Target variable
+
+        # Drop missing values and align indices
+        aligned_data = pd.concat([x_train, y_train], axis=1).dropna()
+        x_train = aligned_data[[edge[0]] + covariate_name]  # Predictor variables
+        y_train = aligned_data[edge[1]]  # Target variable
+
+        # Skip if no data is available
+        if x_train.empty or y_train.empty:
+            print(f"Skipping edge {edge}: No data available for this edge.")
+            continue
+
+        # Fit the linear model
+        try:
+            model = sm.OLS(y_train, sm.add_constant(x_train, has_constant='add'))  # Add intercept
+            results = model.fit()
+
+            # Save the trained model
+            pickle_filename = os.path.join(output_dir, f"{edge[0]}_{edge[1]}.pkl")
+            with open(pickle_filename, "wb") as file:
+                pickle.dump(results, file)
+
+            # Collect model statistics
+            model_stats[edge] = {
+                "R2": results.rsquared,
+                "Coefficients": results.params.tolist(),
+                "P-values": results.pvalues.tolist(),
+            }
+
+        except Exception as e:
+            print(f"Error training model for edge {edge}: {e}")
+            continue
+
+    # Convert model statistics to a DataFrame
+    model_stats_df = pd.DataFrame.from_dict(model_stats, orient='index')
+
+    return model_stats_df
+
+

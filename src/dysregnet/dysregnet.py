@@ -164,7 +164,7 @@ class run(object):
                     #self.cov_df,self.expr, self.control, self.case = functions.process_data(self)
 
 
-                    #self.results, self.model_stats = functions.dyregnet_model(self)
+                    #self.results, self.model_stats = functions.dyregnet_model_old(self)
                     self.model_stats = functions.dyregnet_model(self)
                 
 

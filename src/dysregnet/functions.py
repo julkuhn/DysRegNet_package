@@ -97,7 +97,7 @@ def dyregnet_model_old(data):
         joblib_memory_usage = []
         edge_memory_usage = {} # get the biggest edge 
         edgej_memory_usage = {} # get the biggest edge
-        output_dir = "models/breast"
+        output_dir = "models/exercise"
         os.makedirs(output_dir, exist_ok=True)
         #_______
         

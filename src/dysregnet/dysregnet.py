@@ -128,32 +128,33 @@ class run(object):
                         - still allowed control samples → just to verify not to train with them 
                     """
 
-                    print(type(GRN))
-
                     if type(GRN) == str:
                         
-
+                        self.load_model = True
                         if GRN == 'lung': # TODO hier auch checken, ob die ids matchen?
                             # load model
-                            self.model = "lung_model" # TODO adapt to given files, insert here file path for the corresponding model
+                            self.GRN = pd.read_csv("GENIE3_output/linkedList_output_slurm_gene_tpm_v10_lung_filtered.csv")
                             # TODO grn genes etC? 
-                        elif GRN == 'breat':
+                        elif GRN == 'breast':
                             # load model
-                            self.model = "breast_model"
+                            self.GRN = pd.read_csv("GENIE3_output/linkedList_output_slurm_gene_tpm_v10_breast_mammary_tissu_filtered.csv")
                         else:
                             raise ValueError("Invalid GRN value. Please provide a valid GRN file or a tissue name.")
+                        self.model_dir = f"pickle_models_{GRN}"
                         
                     elif type(GRN) == pd.DataFrame:
+                            self.load_model = False
+                            self.GRN = GRN
                             # check GRN and gene ids
-                            GRN_genes=list(set(GRN.iloc[:,0].values.tolist() + GRN.iloc[:,1].values.tolist()))
-                            GRN_genes=[g for g in GRN_genes if g in expression_data.columns]
+                    GRN_genes=list(set(self.GRN.iloc[:,0].values.tolist() + self.GRN.iloc[:,1].values.tolist()))
+                    GRN_genes=[g for g in GRN_genes if g in expression_data.columns]
 
-                            if not GRN_genes:
-                                raise ValueError('Gene id or name in GRN DataFrame do not match the ones in expression_data DataFrame')
+                    if not GRN_genes:
+                        raise ValueError('Gene id or name in GRN DataFrame do not match the ones in expression_data DataFrame')
 
-                            self.expression_data=self.expression_data[GRN_genes]
-                            self.GRN=GRN[GRN.iloc[:,0].isin(GRN_genes) ]
-                            self.GRN=self.GRN[ self.GRN.iloc[:,1].isin(GRN_genes) ].drop_duplicates()
+                    self.expression_data=self.expression_data[GRN_genes]
+                    self.GRN=self.GRN[self.GRN.iloc[:,0].isin(GRN_genes) ]
+                    self.GRN=self.GRN[ self.GRN.iloc[:,1].isin(GRN_genes) ].drop_duplicates()
                     #___________________________________________
 
                     self.cov_df,self.expr, self.control, self.case = functions.process_data(self)

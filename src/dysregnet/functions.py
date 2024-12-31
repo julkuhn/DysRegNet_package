@@ -11,6 +11,8 @@ import pickle
 import joblib
 import time
 import os
+from itertools import product
+from scipy.stats import combine_pvalues
 #_____________
 
 def process_data(data):
@@ -87,8 +89,6 @@ def dyregnet_model(data):
         # prepare data
         
         #_______
-        output_dir = "/Users/juliakuhn/Desktop/uni/WS2425/Systems_BioMedicine/Project_Phase/pickle_models/" # TODO adapt to given files
-        #_______
         
         # Prepare case data
         if data.cov_df is not None:
@@ -104,46 +104,71 @@ def dyregnet_model(data):
         edges['patient id']=list(case.index.values)
         model_stats = {}
                          
-
-        for tup in tqdm(data.GRN.itertuples(), desc="Processing edges"): # TODO hier genes von expr matrix nehmen
-        for gene in genes # TODO
+        found = 0
+        notfound = 0
+    
+        for tup in tqdm(data.GRN.itertuples(), desc="Processing edges"):
             edge = (tup[1], tup[2])  # Extract TF → target pair 
 
             # Skip self-loops
             if edge[0] == edge[1]:
                 continue
 
-            # Prepare design matrix for case samples
-            x_test = case[[edge[0]] + covariate_name]
-            x_test = sm.add_constant(x_test, has_constant='add')  # Add intercept
-            y_test = case[edge[1]].values
+            if data.load_model:
+                filename = os.path.join(data.model_dir, f"{edge[0]}_{edge[1]}.pkl")
+                try:
+                    with open(filename, "rb") as file:
+                        # Load pre-trained model
+                        results = pickle.load(file)
+                        found +=1
+                except FileNotFoundError:
+                    print(f"Model file not found for edge {edge}. Skipping.")
+                    notfound +=1
+                    continue
 
-            # check if no control samples >3
-            if len(control) < 3:
-                # check if trained models fit control data, use only these and ignore others
-                print('Only 3 control samples, using only these for the model')
-                # prepare control for fitting model TODO correct?
+                # check if no control samples >3
+                if len(control) < 3:
+                    # check if trained models fit control data, use only these and ignore others
+                    # print('Only 3 control samples, using only these for the model')
+                    # prepare control for fitting model TODO correct?
+                    x_train = control[  [edge[0]] + covariate_name ]
+                    x_train = sm.add_constant(x_train, has_constant='add') # add bias
+                    y_train = control[edge[1]].values
+
+                    residuals = y_train - results.predict(x_train)
+                    mean_residual = np.mean(residuals)
+                    std_residual = np.std(residuals)
+                    z_scores = (residuals - mean_residual) / std_residual
+
+                    # Identify significant deviations
+                    significant = np.abs(z_scores) > 2
+
+                    # Optionally skip model if too many significant deviations
+                    if significant.mean() > 0.05:  # e.g., more than 5% are significant
+                        print("Warning: Too many significant deviations. Skipping model.")
+                        continue
+                
+            else: 
                 x_train = control[  [edge[0]] + covariate_name ]
                 x_train = sm.add_constant(x_train, has_constant='add') # add bias
                 y_train = control[edge[1]].values
 
                 # fit the model
                 model = sm.OLS(y_train, x_train)
-                results = model.fit() # TODO interessant
+                results = model.fit()
 
-
-            else:
-                # Load pre-trained model
-                filename = os.path.join(output_dir, f"{edge[0]}_{edge[1]}.pkl")
-                try:
-                    with open(filename, "rb") as file:
-                        results = pickle.load(file)
-                except FileNotFoundError:
-                    print(f"Model file not found for edge {edge}. Skipping.")
-                    continue
-
+          
             # Save model stats
             model_stats[edge] = [results.rsquared] + list(results.params.values) + list(results.pvalues.values)
+            
+            # get residuals of control
+            # TODO: remove the line? do we not need it for the zscore calculation?
+            # resid_control = y_train - results.predict(x_train) 
+
+            # Prepare design matrix for case samples
+            x_test = case[[edge[0]] + covariate_name]
+            x_test = sm.add_constant(x_test, has_constant='add')  # Add intercept
+            y_test = case[edge[1]].values
 
             # Predict target gene expression for case samples
             y_pred = results.predict(x_test)
@@ -171,6 +196,7 @@ def dyregnet_model(data):
             zscore[~valid] = 0.0
             edges[edge] = np.round(zscore, 1)
 
+        if data.load_model: print("Ratio of found models: ",found / (notfound+found))
         # Convert results to DataFrame
         results = pd.DataFrame.from_dict(edges)
         results = results.set_index('patient id')

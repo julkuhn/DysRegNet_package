@@ -106,6 +106,8 @@ def dyregnet_model(data):
                          
         found = 0
         notfound = 0
+        skipped = 0
+        notskipped = 0
     
         for tup in tqdm(data.GRN.itertuples(), desc="Processing edges"):
             edge = (tup[1], tup[2])  # Extract TF → target pair 
@@ -127,7 +129,7 @@ def dyregnet_model(data):
                     continue
 
                 # check if no control samples >3
-                if len(control) < 3:
+                if len(control) > 3:
                     # check if trained models fit control data, use only these and ignore others
                     # print('Only 3 control samples, using only these for the model')
                     # prepare control for fitting model TODO correct?
@@ -142,11 +144,12 @@ def dyregnet_model(data):
 
                     # Identify significant deviations
                     significant = np.abs(z_scores) > 2
-
-                    # Optionally skip model if too many significant deviations
-                    if significant.mean() > 0.05:  # e.g., more than 5% are significant
-                        print("Warning: Too many significant deviations. Skipping model.")
+                    # skip model if too many significant deviations
+                    if significant.mean() > 0.05:
+                        #print("Warning: Too many significant deviations. Skipping model.")
+                        skipped +=1
                         continue
+                    notskipped += 1
                 
             else: 
                 x_train = control[  [edge[0]] + covariate_name ]
@@ -197,6 +200,7 @@ def dyregnet_model(data):
             edges[edge] = np.round(zscore, 1)
 
         if data.load_model: print("Ratio of found models: ",found / (notfound+found))
+        print("Skipped models: ", skipped / (skipped + notskipped) )
         # Convert results to DataFrame
         results = pd.DataFrame.from_dict(edges)
         results = results.set_index('patient id')

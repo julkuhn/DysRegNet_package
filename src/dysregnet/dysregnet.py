@@ -121,11 +121,12 @@ class run(object):
 
                     
                      #___________________________________________
-                    """- GRN param → file or not, not: check if string → tissue → load model
+                    """
+                    TODO s: 
                         - no confounder can be provided → what happens?
                         - simple version: not allowed to include meta, only case no confounderes → no need for meta file
-                        - TODO feautre if only 3 control samples, provide and check if trained models fit control data, use only these and ignore others
-                        - still allowed control samples → just to verify not to train with them 
+                        - flag to skip models that dont fit or set a cut off ? change zscore cutoff?
+                        - loading GRN like this ideal? 
                     """
 
                     if type(GRN) == str:

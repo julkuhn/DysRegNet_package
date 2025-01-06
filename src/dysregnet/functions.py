@@ -282,7 +282,7 @@ def dyregnet_model(data):
     Train models based on the expected (healthy) dataset and save the trained models.
     """
     # Directory to save models
-    output_dir = "models/breast"
+    output_dir = "models/lung"
     os.makedirs(output_dir, exist_ok=True)
 
     # Data preparation: Use the whole dataset
@@ -324,10 +324,17 @@ def dyregnet_model(data):
                 model = sm.OLS(y_train, sm.add_constant(x_train, has_constant='add'))  # Add intercept
                 results = model.fit()
 
+                compressed_model = {
+                    "params": results.params,        # Coefficients
+                    "rsquared": results.rsquared,    # R-squared
+                    "pvalues": results.pvalues       # P-values
+                }
+
                 # Save the trained model
                 pickle_filename = os.path.join(output_dir, f"{edge[0]}_{edge[1]}.pkl")
+
                 with open(pickle_filename, "wb") as file:
-                    pickle.dump(results, file)
+                    pickle.dump(compressed_model, file)
 
                 # Collect model statistics
                 model_stats[edge] = {

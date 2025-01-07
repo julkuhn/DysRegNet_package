@@ -277,6 +277,7 @@ def dyregnet_model_old(data):
         return results, model_stats
 
 
+
 def dyregnet_model(data):
     """
     Train models based on the expected (healthy) dataset and save the trained models.
@@ -295,63 +296,74 @@ def dyregnet_model(data):
     for tup in tqdm(data.GRN.itertuples(), desc="Training models for edges"):
         edge = (tup[1], tup[2])  # Extract TF → target pair
 
-        #print(f"Training model for edge {edge}")
-
         # Skip self-loops
-        if edge[0] != edge[1]:
-            
+        if edge[0] == edge[1]:
+            continue
+
         # Ensure genes exist in the expression data
-            """if edge[0] not in data.expression_data.columns or edge[1] not in data.expression_data.columns:
-                print(f"Skipping edge {edge}: Genes not found in expression data.")
-                continue"""
+        if edge[0] not in data.expression_data.columns or edge[1] not in data.expression_data.columns:
+            print(f"Skipping edge {edge}: Genes not found in expression data.")
+            continue
 
-            # Prepare x_train and y_train
-            x_train = data.expression_data[[edge[0]] + covariate_name]  # Predictor variables
-            y_train = data.expression_data[edge[1]]  # Target variable
+        # Prepare x_train and y_train
+        x_train = data.expression_data[[edge[0]] + covariate_name]  # Predictor variables
+        y_train = data.expression_data[edge[1]]  # Target variable
 
-            # Drop missing values and align indices
-            aligned_data = pd.concat([x_train, y_train], axis=1).dropna()
-            x_train = aligned_data[[edge[0]] + covariate_name]  # Predictor variables
-            y_train = aligned_data[edge[1]]  # Target variable
+        # Drop missing values and align indices
+        aligned_data = pd.concat([x_train, y_train], axis=1).dropna()
+        x_train = aligned_data[[edge[0]] + covariate_name]  # Predictor variables
+        y_train = aligned_data[edge[1]]  # Target variable
 
-            # Skip if no data is available
-            """if x_train.empty or y_train.empty:
-                print(f"Skipping edge {edge}: No data available for this edge.")
-                continue"""
+        # Skip if no data is available
+        if x_train.empty or y_train.empty:
+            print(f"Skipping edge {edge}: No data available for this edge.")
+            continue
 
+        try:
             # Fit the linear model
-            try:
-                model = sm.OLS(y_train, sm.add_constant(x_train, has_constant='add'))  # Add intercept
-                results = model.fit()
+            model = sm.OLS(y_train, sm.add_constant(x_train, has_constant='add'))  # Add intercept
+            results = model.fit()
 
-                compressed_model = {
-                    "params": results.params,        # Coefficients
-                    "rsquared": results.rsquared,    # R-squared
-                    "pvalues": results.pvalues       # P-values
-                }
+            # Save compressed model
+            compressed_model = {
+                "params": results.params.values,   # Convert params to array
+                "rsquared": results.rsquared,
+                "pvalues": results.pvalues.values  # Convert pvalues to array
+            }
 
-                # Save the trained model
-                pickle_filename = os.path.join(output_dir, f"{edge[0]}_{edge[1]}.pkl")
+            # Save the trained model
+            pickle_filename = os.path.join(output_dir, f"{edge[0]}_{edge[1]}.pkl")
+            with open(pickle_filename, "wb") as file:
+                pickle.dump(compressed_model, file)
 
-                with open(pickle_filename, "wb") as file:
-                    pickle.dump(compressed_model, file)
+            # Collect model statistics
+            model_stats[edge] = {
+                "R2": results.rsquared,
+                "Coefficients": results.params.tolist(),
+                "P-values": results.pvalues.tolist(),
+            }
 
-                # Collect model statistics
-                model_stats[edge] = {
-                    "R2": results.rsquared,
-                    "Coefficients": results.params.tolist(),
-                    "P-values": results.pvalues.tolist(),
-                }
+        except Exception as e:
+            print(f"Error training model for edge {edge}: {e}")
+            continue
 
-            except Exception as e:
-                print(f"Error training model for edge {edge}: {e}")
-                continue
+        # Reload model for verification or further calculations
+        with open(pickle_filename, "rb") as file:
+            results_pickle = pickle.load(file)
+
+        # Access saved attributes
+        rsquared = results_pickle["rsquared"]
+        params = np.array(results_pickle["params"])
+        pvalues = np.array(results_pickle["pvalues"])
+
+        # Ensure x_train includes the intercept for predictions
+        x_train_with_const = sm.add_constant(x_train, has_constant='add')
+        y_pred = np.dot(x_train_with_const, params)  # Predict manually
+
+        # Add model statistics
+        model_stats[edge] = [rsquared] + list(params) + list(pvalues)
 
     # Convert model statistics to a DataFrame
     model_stats_df = pd.DataFrame.from_dict(model_stats, orient='index')
 
-    
-
     return model_stats_df
-
-

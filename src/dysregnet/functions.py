@@ -13,6 +13,7 @@ import time
 import tracemalloc
 import matplotlib.pyplot as plt
 import os
+from .linearmodel import LinearModel
 #_____________
 
 def process_data(data):
@@ -278,7 +279,7 @@ def dyregnet_model_old(data):
 
 
 
-def dyregnet_model(data):
+def dysregnet_model(data):
     """
     Train models based on the expected (healthy) dataset and save the trained models.
     """
@@ -314,54 +315,34 @@ def dyregnet_model(data):
         x_train = aligned_data[[edge[0]] + covariate_name]  # Predictor variables
         y_train = aligned_data[edge[1]]  # Target variable
 
+
         # Skip if no data is available
         if x_train.empty or y_train.empty:
             print(f"Skipping edge {edge}: No data available for this edge.")
             continue
 
         try:
-            # Fit the linear model
-            model = sm.OLS(y_train, sm.add_constant(x_train, has_constant='add'))  # Add intercept
-            results = model.fit()
-
-            # Save compressed model
-            compressed_model = {
-                "params": results.params.values,   # Convert params to array
-                "rsquared": results.rsquared,
-                "pvalues": results.pvalues.values  # Convert pvalues to array
-            }
+            model = LinearModel(predictors=[edge[0]] + covariate_name, target=edge[1])
+            results = model.train(x_train, y_train)
 
             # Save the trained model
             pickle_filename = os.path.join(output_dir, f"{edge[0]}_{edge[1]}.pkl")
-            with open(pickle_filename, "wb") as file:
-                pickle.dump(compressed_model, file)
-
-            # Collect model statistics
-            model_stats[edge] = {
-                "R2": results.rsquared,
-                "Coefficients": results.params.tolist(),
-                "P-values": results.pvalues.tolist(),
-            }
+            model.save(pickle_filename)
 
         except Exception as e:
             print(f"Error training model for edge {edge}: {e}")
             continue
 
-        # Reload model for verification or further calculations
-        with open(pickle_filename, "rb") as file:
-            results_pickle = pickle.load(file)
+        # load model 
+        loaded_model = LinearModel.load(os.path.join(output_dir, f"{edge[0]}_{edge[1]}.pkl"))
 
-        # Access saved attributes
-        rsquared = results_pickle["rsquared"]
-        params = np.array(results_pickle["params"])
-        pvalues = np.array(results_pickle["pvalues"])
+        # Vorhersagen machen
+        x_test = data.expression_data[[edge[0]] + covariate_name]
+        y_pred = loaded_model.predict(x_test)
 
-        # Ensure x_train includes the intercept for predictions
-        x_train_with_const = sm.add_constant(x_train, has_constant='add')
-        y_pred = np.dot(x_train_with_const, params)  # Predict manually
 
         # Add model statistics
-        model_stats[edge] = [rsquared] + list(params) + list(pvalues)
+        model_stats[edge] = [loaded_model.rsquared] + list(loaded_model.params) + list(loaded_model.pvalues)
 
     # Convert model statistics to a DataFrame
     model_stats_df = pd.DataFrame.from_dict(model_stats, orient='index')

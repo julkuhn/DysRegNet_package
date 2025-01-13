@@ -166,7 +166,7 @@ class run(object):
 
 
                     #self.results, self.model_stats = functions.dyregnet_model_old(self)
-                    self.model_stats = functions.dyregnet_model(self)
+                    self.model_stats = functions.dysregnet_model(self)
                 
 
 

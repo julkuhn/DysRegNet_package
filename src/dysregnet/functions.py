@@ -284,7 +284,7 @@ def dysregnet_model(data):
     Train models based on the expected (healthy) dataset and save the trained models.
     """
     # Directory to save models
-    output_dir = "models/lung"
+    output_dir = "models_new_2/breast"
     os.makedirs(output_dir, exist_ok=True)
 
     # Data preparation: Use the whole dataset
@@ -328,6 +328,15 @@ def dysregnet_model(data):
             # Save the trained model
             pickle_filename = os.path.join(output_dir, f"{edge[0]}_{edge[1]}.pkl")
             model.save(pickle_filename)
+
+            """# Modell erstellen und trainieren
+            model = LinearModel(predictors=[edge[0]] + covariate_name, target=edge[1])
+            model.train(x_train, y_train)
+
+            # Modell speichern
+            pickle_filename = os.path.join(output_dir, f"{edge[0]}_{edge[1]}.pkl")
+            with open(pickle_filename, "wb") as file:
+                pickle.dump(model, file)"""
 
         except Exception as e:
             print(f"Error training model for edge {edge}: {e}")

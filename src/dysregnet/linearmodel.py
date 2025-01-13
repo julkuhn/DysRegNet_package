@@ -59,10 +59,12 @@ class LinearModel:
         """
         with open(filename, "rb") as file:
             data = pickle.load(file)
+            #return data
+            
             return cls(
-                predictors=data["predictors"],
-                target=data["target"],
-                params=np.array(data["params"]),
-                rsquared=data["rsquared"],
-                pvalues=np.array(data["pvalues"])
-            )
+                    predictors=data["predictors"],
+                    target=data["target"],
+                    params=np.array(data["params"]),
+                    rsquared=data["rsquared"],
+                    pvalues=np.array(data["pvalues"])
+                )

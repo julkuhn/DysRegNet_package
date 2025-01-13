@@ -2,6 +2,9 @@
 import pandas as pd
 
 from . import functions
+import requests
+import os
+import zipfile
 
 
 
@@ -130,7 +133,44 @@ class run(object):
                     """
 
                     if type(GRN) == str:
-                        
+                        self.load_model = True
+                        if GRN in ['lung', 'breast']:
+                            print(f"Processing {GRN} GRN file...")
+                            
+                            #zip_url = f"{self.zenodo_base_url}/{GRN}_models.zip?download=1"
+                            zip_url = "https://zenodo.org/records/14634417/files/lung_models_neww.zip?download=1"
+                            zip_filepath = f"models/{GRN}_models.zip"
+                            model_folder = f"models"
+                            
+                            #grn_url = f"{self.zenodo_base_url}/{GRN}_GRN.csv?download=1"
+                            grn_url = "https://zenodo.org/records/14634417/files/linkedList_output_slurm_%20gene_tpm_v10_lung_filtered%20.csv?download=1"
+                            grn_filepath = f"models/{GRN}_GRN.csv"
+
+                            # Check if the GRN file and model file already exist
+                            if os.path.exists(grn_filepath) and os.path.exists(zip_filepath):
+                                print(f"GRN file and model ZIP already exist locally. Skipping download.")
+                            else:
+                                print(f"Downloading {GRN} GRN file and model ZIP...")
+                                # Download files
+                                self.download_file(zip_url, zip_filepath)
+                                self.download_file(grn_url, grn_filepath)
+
+                            # Check if the ZIP file is already extracted
+                            if not os.path.exists(f"{model_folder}/{GRN}"):
+                                print(f"Extracting {GRN} model ZIP...")
+                                self.extract_zip(zip_filepath, model_folder)
+
+                            # Verify model file presence
+                            model_filepath = os.path.join(model_folder, f"{GRN}_models.zip")
+                            if not os.path.exists(model_filepath):
+                                raise ValueError(f"Expected GRN file not found at {model_filepath}")
+
+                            # Load the GRN file into a DataFrame
+                            self.GRN = pd.read_csv(grn_filepath)
+                            self.model_dir = f"{model_folder}/{GRN}"
+                        else:
+                            raise ValueError("Invalid GRN value. Please provide a valid GRN file or a tissue name.")
+                        """
                         self.load_model = True
                         if GRN == 'lung': # TODO hier auch checken, ob die ids matchen?
                             # load model
@@ -142,7 +182,7 @@ class run(object):
                         else:
                             raise ValueError("Invalid GRN value. Please provide a valid GRN file or a tissue name.")
                         self.model_dir = f"pickle_models_{GRN}"
-                        
+                        """
                     elif type(GRN) == pd.DataFrame:
                             self.load_model = False
                             self.GRN = GRN
@@ -184,7 +224,37 @@ class run(object):
         
         
 
+        @staticmethod
+        def download_file(url, filepath):
+            """
+            Download a file from a URL and save it to a local file path, ensuring the directory exists.
+            """
+            # Ensure the directory exists
+            directory = os.path.dirname(filepath)
+            if directory and not os.path.exists(directory):
+                os.makedirs(directory)
             
+            try:
+                response = requests.get(url, stream=True)
+                response.raise_for_status()
+                with open(filepath, 'wb') as file:
+                    for chunk in response.iter_content(chunk_size=8192):
+                        file.write(chunk)
+                print(f"Downloaded file to {filepath}")
+            except requests.exceptions.RequestException as e:
+                raise ValueError(f"Error downloading file from {url}: {e}")
+
+        @staticmethod
+        def extract_zip(zip_filepath, extract_to):
+            """
+            Extract a ZIP file to the specified directory.
+            """
+            try:
+                with zipfile.ZipFile(zip_filepath, 'r') as zip_ref:
+                    zip_ref.extractall(extract_to)
+                print(f"Extracted {zip_filepath} to {extract_to}")
+            except zipfile.BadZipFile as e:
+                raise ValueError(f"Error extracting ZIP file {zip_filepath}: {e}")
             
             
             

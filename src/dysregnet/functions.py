@@ -1,5 +1,5 @@
 import pandas as pd
-from scipy.stats import zscore
+from scipy.stats import zscore, norm, combine_pvalues
 from sklearn.preprocessing import StandardScaler
 from tqdm import tqdm
 import numpy as np
@@ -13,6 +13,7 @@ import time
 import os
 from itertools import product
 from scipy.stats import combine_pvalues
+from .linearmodel import LinearModel
 #_____________
 
 def process_data(data):
@@ -118,6 +119,7 @@ def dyregnet_model(data):
 
             if data.load_model:
                 filename = os.path.join(data.model_dir, f"{edge[0]}_{edge[1]}.pkl")
+                print("Filename: ", filename)
                 try:
                     with open(filename, "rb") as file:
                         # Load pre-trained model
@@ -142,10 +144,14 @@ def dyregnet_model(data):
                     std_residual = np.std(residuals)
                     z_scores = (residuals - mean_residual) / std_residual
 
+                    pvalues = stats.norm.sf(abs(z_scores))
+                    combined_pvalue, _ = combine_pvalues(pvalues, method='fisher')
+
                     # Identify significant deviations
                     significant = np.abs(z_scores) > 2
                     # skip model if too many significant deviations
-                    if significant.mean() > 0.05:
+                    alpha = 0.05
+                    if combined_pvalue < alpha:
                         #print("Warning: Too many significant deviations. Skipping model.")
                         skipped +=1
                         continue
@@ -189,7 +195,25 @@ def dyregnet_model(data):
 
             # Z-score calculation (assuming a standard normal distribution for residuals)
             zscore = resid_case / resid_case.std()
+            """
+            residuals = y_train - results.predict(x_train)
+            mean_residual = np.mean(residuals)
+            std_residual = np.std(residuals)
+            z_scores = (residuals - mean_residual) / std_residual
 
+            pvalues = stats.norm.sf(abs(z_scores))
+            combined_pvalue, _ = combine_pvalues(pvalues, method='fisher')
+
+            # Identify significant deviations
+            significant = np.abs(z_scores) > 2
+            # skip model if too many significant deviations
+            alpha = 0.05
+            if combined_pvalue < alpha:
+                #print("Warning: Too many significant deviations. Skipping model.")
+                skipped +=1
+                continue
+            notskipped += 1
+            """
             # Convert z-scores to p-values and apply multiple testing correction
             pvalues = stats.norm.sf(abs(zscore)) * sides
             pvalues = sm.stats.multipletests(pvalues, method='bonferroni', alpha=data.bonferroni_alpha)[1]

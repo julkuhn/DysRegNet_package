@@ -21,7 +21,10 @@ def process_data(data):
         
         # process covariates and design matrix
         
-        all_covariates = data.CatCov + data.ConCov
+        if data.CatCov is not None:
+            all_covariates = data.CatCov + data.ConCov
+        else:
+            all_covariates = None
 
         if not all_covariates or len(data.meta)==1:
 
@@ -29,8 +32,7 @@ def process_data(data):
                 print('You did not input any covariates in CatCov or ConCov parameters, proceeding without them.')
                 cov_df=None
 
-        else:
-
+        elif data.meta is not None:
 
                 # check if covariates exist in meta
                 if not set(all_covariates).issubset(data.meta.columns):
@@ -73,9 +75,13 @@ def process_data(data):
             expr = data.expression_data
         
         
-        #get control and case sample 
-        control = data.meta[ data.meta[data.conCol]==0 ].index.values.tolist()
-        case = data.meta[ data.meta[data.conCol]==1 ].index.values.tolist()
+        if data.meta is not None:
+            #get control and case sample 
+            control = data.meta[ data.meta[data.conCol]==0 ].index.values.tolist()
+            case = data.meta[ data.meta[data.conCol]==1 ].index.values.tolist()
+        else:
+            control = None
+            case = None
 
         return cov_df, expr, control, case
     
@@ -92,17 +98,20 @@ def dyregnet_model(data):
         #_______
         
         # Prepare case data
+        edges = {}
+
         if data.cov_df is not None:
             control=pd.merge(data.cov_df.loc[data.control],data.expr, left_index=True, right_index=True).drop_duplicates()
             case = pd.merge(data.cov_df.loc[data.case], data.expr, left_index=True, right_index=True).drop_duplicates()
             covariate_name = list(data.cov_df.columns)
+            edges['patient id']=list(case.index.values)
         else:
-            control=data.expr.loc[data.control]
-            case = data.expr.loc[data.case]
+            control = data.control
+            case = data.expr
             covariate_name = []
+            patient_id = None
             
-        edges = {}
-        edges['patient id']=list(case.index.values)
+        # edges['patient id']=list(case.index.values)
         model_stats = {}
                          
         found = 0
@@ -132,31 +141,32 @@ def dyregnet_model(data):
                     continue
 
                 # check if no control samples >3
-                if len(control) > 3:
-                    # check if trained models fit control data, use only these and ignore others
-                    # print('Only 3 control samples, using only these for the model')
-                    # prepare control for fitting model TODO correct?
-                    x_train = control[  [edge[0]] + covariate_name ]
-                    x_train = sm.add_constant(x_train, has_constant='add') # add bias
-                    y_train = control[edge[1]].values
+                if control is not None:
+                    if len(control) > 3:
+                        # check if trained models fit control data, use only these and ignore others
+                        # print('Only 3 control samples, using only these for the model')
+                        # prepare control for fitting model TODO correct?
+                        x_train = control[  [edge[0]] + covariate_name ]
+                        x_train = sm.add_constant(x_train, has_constant='add') # add bias
+                        y_train = control[edge[1]].values
 
-                    residuals = y_train - results.predict(x_train)
-                    mean_residual = np.mean(residuals)
-                    std_residual = np.std(residuals)
-                    z_scores = (residuals - mean_residual) / std_residual
+                        residuals = y_train - results.predict(x_train)
+                        mean_residual = np.mean(residuals)
+                        std_residual = np.std(residuals)
+                        z_scores = (residuals - mean_residual) / std_residual
 
-                    pvalues = stats.norm.sf(abs(z_scores))
-                    combined_pvalue, _ = combine_pvalues(pvalues, method='fisher')
+                        pvalues = stats.norm.sf(abs(z_scores))
+                        combined_pvalue, _ = combine_pvalues(pvalues, method='fisher')
 
-                    # Identify significant deviations
-                    significant = np.abs(z_scores) > 2
-                    # skip model if too many significant deviations
-                    alpha = 0.05
-                    if combined_pvalue < alpha:
-                        #print("Warning: Too many significant deviations. Skipping model.")
-                        skipped +=1
-                        continue
-                    notskipped += 1
+                        # Identify significant deviations
+                        significant = np.abs(z_scores) > 2
+                        # skip model if too many significant deviations
+                        alpha = 0.05
+                        if combined_pvalue < alpha:
+                            #print("Warning: Too many significant deviations. Skipping model.")
+                            skipped +=1
+                            continue
+                        notskipped += 1
                 
             else: 
                 x_train = control[  [edge[0]] + covariate_name ]
@@ -225,10 +235,12 @@ def dyregnet_model(data):
             edges[edge] = np.round(zscore, 1)
 
         if data.load_model: print("Ratio of found models: ",found / (notfound+found))
-        print("Skipped models: ", skipped / (skipped + notskipped) )
+        if skipped + notskipped > 0:
+            print("Skipped models: ", skipped / (skipped + notskipped) )
         # Convert results to DataFrame
         results = pd.DataFrame.from_dict(edges)
-        results = results.set_index('patient id')
+        if patient_id is not None:
+            results = results.set_index('patient id')
 
         # Model stats DataFrame
         model_stats_cols = ["R2"] + ["coef_" + coef for coef in ["intercept", "TF"] + covariate_name] + \

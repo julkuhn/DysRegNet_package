@@ -19,7 +19,7 @@ class run(object):
         def __init__(self, 
                      expression_data,
                      GRN,
-                     meta, 
+                     meta = None, 
                      conCol='condition', 
                      CatCov=[],  
                      ConCov=[],
@@ -40,7 +40,8 @@ class run(object):
                     GRN: pandas DataFrame 
                         Gene Regulatory Network (GRN) with two columns in the following order ['TF', 'target'].
 
-                    meta: pandas DataFrame  
+                    meta: pandas DataFrame, default: None
+                        If provided it should contain: 
                         The first column has to contain patients/sample IDs. 
                         Further columns can be used to define covariates and the sample condition. 
                         Please make sure to have a condition column in the meta DataFrame with 0 indicating control and 1 indicating case samples.
@@ -121,6 +122,15 @@ class run(object):
                         # split sample ids (cases and control)
                         self.control= list( self.meta[self.meta[conCol]==0].index )
                         self.case= list( self.meta[self.meta[conCol]==1].index )
+                    
+                    else:
+                        self.expression_data=expression_data
+                        self.meta=None
+                        self.control=None
+                        self.case=None
+                        self.conCol=None
+                        self.ConCov=None
+                        self.CatCov=None
 
                     
                      #___________________________________________
@@ -205,6 +215,7 @@ class run(object):
                     self.GRN=self.GRN[ self.GRN.iloc[:,1].isin(GRN_genes) ].drop_duplicates()
                     #___________________________________________
 
+                    
                     self.cov_df,self.expr, self.control, self.case = functions.process_data(self)
                     self.results, self.model_stats = functions.dyregnet_model(self)
                 

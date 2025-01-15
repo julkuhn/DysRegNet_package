@@ -119,12 +119,13 @@ def dyregnet_model(data):
 
             if data.load_model:
                 filename = os.path.join(data.model_dir, f"{edge[0]}_{edge[1]}.pkl")
-                print("Filename: ", filename)
+                # print("Filename: ", filename)
                 try:
-                    with open(filename, "rb") as file:
+                    #with open(filename, "rb") as file:
                         # Load pre-trained model
-                        results = pickle.load(file)
-                        found +=1
+                        # results = pickle.load(file)
+                    results = LinearModel.load(filename)
+                    found +=1
                 except FileNotFoundError:
                     print(f"Model file not found for edge {edge}. Skipping.")
                     notfound +=1
@@ -168,7 +169,7 @@ def dyregnet_model(data):
 
           
             # Save model stats
-            model_stats[edge] = [results.rsquared] + list(results.params.values) + list(results.pvalues.values)
+            model_stats[edge] = [results.rsquared] + list(results.params) + list(results.pvalues)
             
             # get residuals of control
             # TODO: remove the line? do we not need it for the zscore calculation?
@@ -187,7 +188,7 @@ def dyregnet_model(data):
 
             # Directional condition (if applicable)
             cond = True
-            direction = np.sign(results.params.iloc[1])  # Direction of TF influence
+            direction = np.sign(results.params[1]) # Direction of TF influence
             sides = 2  # Default: two-sided p-value
             if data.direction_condition:
                 cond = (direction * resid_case) < 0

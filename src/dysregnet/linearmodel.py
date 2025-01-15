@@ -36,7 +36,7 @@ class LinearModel:
         if self.params is None:
             raise ValueError("The model is not trained")
         
-        x_test = sm.add_constant(x_test, has_constant='add')  # add intercept
+        #x_test = sm.add_constant(x_test, has_constant='add')  # add intercept
         return np.dot(x_test, self.params)
 
     def save(self, filename):
@@ -59,12 +59,11 @@ class LinearModel:
         """
         with open(filename, "rb") as file:
             data = pickle.load(file)
-            return data
-            
-            """cls(
+
+            return cls(
                 predictors=data["predictors"],
                 target=data["target"],
                 params=np.array(data["params"]),
                 rsquared=data["rsquared"],
                 pvalues=np.array(data["pvalues"])
-            )"""
+            )

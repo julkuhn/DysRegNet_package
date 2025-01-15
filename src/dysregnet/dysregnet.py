@@ -136,16 +136,23 @@ class run(object):
                         self.load_model = True
                         if GRN in ['lung', 'breast']:
                             print(f"Processing {GRN} GRN file...")
-                            
-                            #zip_url = f"{self.zenodo_base_url}/{GRN}_models.zip?download=1"
-                            zip_url = "https://zenodo.org/records/14634417/files/lung_models_neww.zip?download=1"
-                            zip_filepath = f"models/{GRN}_models.zip"
                             model_folder = f"models"
-                            
-                            #grn_url = f"{self.zenodo_base_url}/{GRN}_GRN.csv?download=1"
-                            grn_url = "https://zenodo.org/records/14634417/files/linkedList_output_slurm_%20gene_tpm_v10_lung_filtered%20.csv?download=1"
+                            zip_filepath = f"models/{GRN}_models.zip"
                             grn_filepath = f"models/{GRN}_GRN.csv"
 
+                            if GRN == 'lung':
+                                #zip_url = f"{self.zenodo_base_url}/{GRN}_models.zip?download=1"
+                                zip_url = "https://zenodo.org/records/14634417/files/lung_models_neww.zip?download=1"
+                                
+                                #grn_url = f"{self.zenodo_base_url}/{GRN}_GRN.csv?download=1"
+                                grn_url = "https://zenodo.org/records/14634417/files/linkedList_output_slurm_%20gene_tpm_v10_lung_filtered%20.csv?download=1"
+                                
+
+                            elif GRN == 'breast':
+                                #zip_url = f"{self.zenodo_base_url}/{GRN}_models.zip?download=1"
+                                zip_url = "https://zenodo.org/records/14634761/files/breast_models.zip?download=1"
+                                #grn_url = f"{self.zenodo_base_url}/{GRN}_GRN.csv?download=1"
+                                grn_url = "https://zenodo.org/records/14634761/files/linkedList_output_slurm_%20gene_tpm_v10_breast_mammary_tissu_filtered%20.csv?download=1"
                             # Check if the GRN file and model file already exist
                             if os.path.exists(grn_filepath) and os.path.exists(zip_filepath):
                                 print(f"GRN file and model ZIP already exist locally. Skipping download.")
@@ -156,9 +163,9 @@ class run(object):
                                 self.download_file(grn_url, grn_filepath)
 
                             # Check if the ZIP file is already extracted
-                            if not os.path.exists(f"{model_folder}/{GRN}"):
-                                print(f"Extracting {GRN} model ZIP...")
-                                self.extract_zip(zip_filepath, model_folder)
+                            #if not os.path.exists(f"{model_folder}/{GRN}"):
+                            print(f"Extracting {GRN} model ZIP...")
+                            self.extract_zip(zip_filepath, model_folder)
 
                             # Verify model file presence
                             model_filepath = os.path.join(model_folder, f"{GRN}_models.zip")

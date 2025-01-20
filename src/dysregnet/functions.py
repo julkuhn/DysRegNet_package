@@ -109,7 +109,7 @@ def dyregnet_model(data):
             control = data.control
             case = data.expr
             covariate_name = []
-            patient_id = None
+            edges['patient id']=list(case.index.values)
             
         # edges['patient id']=list(case.index.values)
         model_stats = {}
@@ -239,12 +239,11 @@ def dyregnet_model(data):
             print("Skipped models: ", skipped / (skipped + notskipped) )
         # Convert results to DataFrame
         results = pd.DataFrame.from_dict(edges)
-        if patient_id is not None:
-            results = results.set_index('patient id')
+        #if patient_id is not None:
+        results = results.set_index('patient id')
 
         # Model stats DataFrame
         model_stats_cols = ["R2"] + ["coef_" + coef for coef in ["intercept", "TF"] + covariate_name] + \
                         ["pval_" + coef for coef in ["intercept", "TF"] + covariate_name]
         model_stats = pd.DataFrame([model_stats[edge] for edge in results.columns], index=results.columns, columns=model_stats_cols)
-
         return results, model_stats

@@ -27,10 +27,12 @@ def process_data(data):
             all_covariates = None
 
         if not all_covariates or len(data.meta)==1:
-
-                # No covariate provided
-                print('You did not input any covariates in CatCov or ConCov parameters, proceeding without them.')
-                cov_df=None
+                #if len(data.control) > 3:
+                     #raise ValueError("You did not input any covariates in CatCov or ConCov parameters, but you have more than 3 control samples. Please provide covariates in the meta DataFrame. ")
+                #else:
+                    # No covariate provided
+                    print('You did not input any covariates in CatCov or ConCov parameters, proceeding without them.')
+                    cov_df=None
 
         elif data.meta is not None:
 
@@ -104,14 +106,17 @@ def dyregnet_model(data):
             control=pd.merge(data.cov_df.loc[data.control],data.expr, left_index=True, right_index=True).drop_duplicates()
             case = pd.merge(data.cov_df.loc[data.case], data.expr, left_index=True, right_index=True).drop_duplicates()
             covariate_name = list(data.cov_df.columns)
-            edges['patient id']=list(case.index.values)
-        else:
+        
+        elif data.load_model: 
             control = data.control
             case = data.expr
             covariate_name = []
-            edges['patient id']=list(case.index.values)
-            
-        # edges['patient id']=list(case.index.values)
+
+        else : # grn is given
+            control=data.expr.loc[data.control]
+            case=data.expr.loc[data.case]  
+        
+        edges['patient id']=list(case.index.values)
         model_stats = {}
                          
         found = 0
@@ -127,6 +132,7 @@ def dyregnet_model(data):
                 continue
 
             if data.load_model:
+                # print("Loading model for edge: ", edge)
                 filename = os.path.join(data.model_dir, f"{edge[0]}_{edge[1]}.pkl")
                 # print("Filename: ", filename)
                 try:
@@ -143,9 +149,12 @@ def dyregnet_model(data):
                 # check if no control samples >3
                 if control is not None:
                     if len(control) > 3:
+                        control=data.expr.loc[data.control]
+                        case=data.expr.loc[data.case]  
                         # check if trained models fit control data, use only these and ignore others
                         # print('Only 3 control samples, using only these for the model')
                         # prepare control for fitting model TODO correct?
+                        
                         x_train = control[  [edge[0]] + covariate_name ]
                         x_train = sm.add_constant(x_train, has_constant='add') # add bias
                         y_train = control[edge[1]].values
@@ -198,8 +207,12 @@ def dyregnet_model(data):
 
             # Directional condition (if applicable)
             cond = True
-            direction = np.sign(results.params[1]) # Direction of TF influence
+            if data.load_model: 
+                direction = np.sign(results.params[1]) # Direction of TF influence
+            else:
+                direction = np.sign(results.params.iloc[1])
             sides = 2  # Default: two-sided p-value
+
             if data.direction_condition:
                 cond = (direction * resid_case) < 0
                 sides = 1  # One-sided p-value

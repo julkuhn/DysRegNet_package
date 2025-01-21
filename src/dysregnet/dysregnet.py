@@ -151,17 +151,12 @@ class run(object):
                             grn_filepath = f"models/{GRN}_GRN.csv"
 
                             if GRN == 'lung':
-                                #zip_url = f"{self.zenodo_base_url}/{GRN}_models.zip?download=1"
                                 zip_url = "https://zenodo.org/records/14634417/files/lung_models_neww.zip?download=1"
-                                
-                                #grn_url = f"{self.zenodo_base_url}/{GRN}_GRN.csv?download=1"
                                 grn_url = "https://zenodo.org/records/14634417/files/linkedList_output_slurm_%20gene_tpm_v10_lung_filtered%20.csv?download=1"
                                 
 
                             elif GRN == 'breast':
-                                #zip_url = f"{self.zenodo_base_url}/{GRN}_models.zip?download=1"
                                 zip_url = "https://zenodo.org/records/14634761/files/breast_models.zip?download=1"
-                                #grn_url = f"{self.zenodo_base_url}/{GRN}_GRN.csv?download=1"
                                 grn_url = "https://zenodo.org/records/14634761/files/linkedList_output_slurm_%20gene_tpm_v10_breast_mammary_tissu_filtered%20.csv?download=1"
                             # Check if the GRN file and model file already exist
                             if os.path.exists(grn_filepath) and os.path.exists(zip_filepath):
@@ -187,6 +182,7 @@ class run(object):
                             self.model_dir = f"{model_folder}/{GRN}"
                         else:
                             raise ValueError("Invalid GRN value. Please provide a valid GRN file or a tissue name.")
+                        
                         """
                         self.load_model = True
                         if GRN == 'lung': # TODO hier auch checken, ob die ids matchen?
@@ -203,6 +199,8 @@ class run(object):
                     elif type(GRN) == pd.DataFrame:
                             self.load_model = False
                             self.GRN = GRN
+                            
+
                             # check GRN and gene ids
                     GRN_genes=list(set(self.GRN.iloc[:,0].values.tolist() + self.GRN.iloc[:,1].values.tolist()))
                     GRN_genes=[g for g in GRN_genes if g in expression_data.columns]

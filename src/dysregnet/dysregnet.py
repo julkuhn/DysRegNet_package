@@ -120,7 +120,7 @@ class run(object):
                                 raise ValueError(" Invalid values in '%s' column in meta DataFrame. Please make sure to have condition column in the meta DataFrame with 0 as control and 1 as the condition (int)." % self.conCol)
 
                         # split sample ids (cases and control)
-                        self.control= list( self.meta[self.meta[conCol]==0].index )
+                        self.control= list( self.meta[self.meta[conCol]==0].index)
                         self.case= list( self.meta[self.meta[conCol]==1].index )
                     
                     else:

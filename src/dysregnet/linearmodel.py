@@ -55,15 +55,21 @@ class LinearModel:
     @classmethod
     def load(cls, filename):
         """
-        loads model from file
+        Loads a LinearModel instance from a file.
         """
-        with open(filename, "rb") as file:
-            data = pickle.load(file)
-
-            return cls(
-                predictors=data["predictors"],
-                target=data["target"],
-                params=np.array(data["params"]),
-                rsquared=data["rsquared"],
-                pvalues=np.array(data["pvalues"])
-            )
+        try:
+            with open(filename, "rb") as file:
+                data = pickle.load(file)
+                # Check if data is already an instance of LinearModel
+                if isinstance(data, cls):
+                    return data
+                # Otherwise, assume it's a dictionary of attributes
+                return cls(
+                    predictors=data["predictors"],
+                    target=data["target"],
+                    params=np.array(data["params"]),
+                    rsquared=data["rsquared"],
+                    pvalues=np.array(data["pvalues"])
+                )
+        except Exception as e:
+            raise Exception(f"An error occurred while loading the model: {e}") from e

@@ -136,11 +136,9 @@ def dyregnet_model(data):
                 filename = os.path.join(data.model_dir, f"{edge[0]}_{edge[1]}.pkl")
                 # print("Filename: ", filename)
                 try:
-                    #with open(filename, "rb") as file:
-                        # Load pre-trained model
-                        # results = pickle.load(file)
                     results = LinearModel.load(filename)
                     found +=1
+
                 except FileNotFoundError:
                     print(f"Model file not found for edge {edge}. Skipping.")
                     notfound +=1

@@ -151,8 +151,8 @@ class run(object):
                             grn_filepath = f"models/{GRN}_GRN.csv"
 
                             if GRN == 'lung':
-                                zip_url = "https://zenodo.org/records/14634417/files/lung_models_neww.zip?download=1"
-                                grn_url = "https://zenodo.org/records/14634417/files/linkedList_output_slurm_%20gene_tpm_v10_lung_filtered%20.csv?download=1"
+                                zip_url = "https://zenodo.org/records/14634761/files/lung_models.zip?download=1"
+                                grn_url = "https://zenodo.org/records/14634761/files/linkedList_output_slurm_%20gene_tpm_v10_lung_filtered%20.csv?download=1"
                                 
 
                             elif GRN == 'breast':
@@ -199,7 +199,7 @@ class run(object):
                     elif type(GRN) == pd.DataFrame:
                             self.load_model = False
                             self.GRN = GRN
-                            
+
 
                             # check GRN and gene ids
                     GRN_genes=list(set(self.GRN.iloc[:,0].values.tolist() + self.GRN.iloc[:,1].values.tolist()))

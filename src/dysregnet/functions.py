@@ -28,7 +28,7 @@ def process_data(data):
 
         if not all_covariates or len(data.meta)==1:
                 #if len(data.control) > 3:
-                     #raise ValueError("You did not input any covariates in CatCov or ConCov parameters, but you have more than 3 control samples. Please provide covariates in the meta DataFrame. ")
+                     #raise ValueError("You did not input any covariates in CatCov or ConCov parameters, but you have more than 3 control samples")
                 #else:
                     # No covariate provided
                     print('You did not input any covariates in CatCov or ConCov parameters, proceeding without them.')
@@ -123,6 +123,8 @@ def dyregnet_model(data):
         notfound = 0
         skipped = 0
         notskipped = 0
+        if len(control) > 3:
+            print("Warning: You have more than 3 control samples")
     
         for tup in tqdm(data.GRN.itertuples(), desc="Processing edges"):
             edge = (tup[1], tup[2])  # Extract TF → target pair 
@@ -163,7 +165,7 @@ def dyregnet_model(data):
                         z_scores = (residuals - mean_residual) / std_residual
 
                         pvalues = stats.norm.sf(abs(z_scores))
-                        combined_pvalue, _ = combine_pvalues(pvalues, method='fisher')
+                        _, combined_pvalue = combine_pvalues(pvalues, method='fisher')
 
                         # Identify significant deviations
                         significant = np.abs(z_scores) > 2
@@ -248,10 +250,27 @@ def dyregnet_model(data):
         if data.load_model: print("Ratio of found models: ",found / (notfound+found))
         if skipped + notskipped > 0:
             print("Skipped models: ", skipped / (skipped + notskipped) )
-        # Convert results to DataFrame
-        results = pd.DataFrame.from_dict(edges)
+     
+        #results = pd.DataFrame.from_dict(edges) # TODO hier Fehler
         #if patient_id is not None:
-        results = results.set_index('patient id')
+        #results = results.set_index('patient id')
+    
+
+        max_length = max(len(v) for v in edges.values())
+        if not edges:
+            print("Edges dictionary is empty.")
+            raise ValueError("Edges dictionary is empty. No data to process.")
+
+        # Convert to DataFrame
+        try:
+            results = pd.DataFrame.from_dict(edges)
+            results = results.set_index('patient id')
+        except ValueError as e:
+            print("Error creating DataFrame from edges:", e)
+            for key, value in edges.items():
+                print(f"{key}: {len(value)}")
+            raise
+
 
         # Model stats DataFrame
         model_stats_cols = ["R2"] + ["coef_" + coef for coef in ["intercept", "TF"] + covariate_name] + \

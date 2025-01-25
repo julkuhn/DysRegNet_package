@@ -89,6 +89,11 @@ class run(object):
                     self.normaltest=normaltest
                     self.normaltest_alpha=normaltest_alpha
                     self.direction_condition=direction_condition
+                    
+                    self.expression_data=expression_data
+
+                    if self.expression_data.empty:
+                                            raise ValueError('Expression data is missing and necessary for model training')
 
 
                     # quality check of parameters
@@ -96,58 +101,9 @@ class run(object):
                     # set sample as indexes
                     meta = meta.set_index(meta.columns[0])
 
-                    # TODOself.expression_data = pd.DataFrame(expression_data).transpose()
-                    # Step 1: Set the first row as column names
-                    # TODOself.expression_data.columns = expression_data.iloc[0]  # Use the first row as column names
-
-                    # Step 2: Drop the first row
-                    # TODOself.expression_data = self.expression_data[1:].reset_index(drop=True)
-                    # self.expression_data = expr_data.set_index(expr_data.iloc[:, 0]) # old code 
-
-                   
-
-                    
-                    
-
-                    # check sample ids
-                    """samples=[ s for s in  list(meta.index) if s in list(expression_data.index) ]
-                    if not samples:
-                          raise ValueError("Sample columns are not found or the ids don't match. Please make sure that the first column in 'expression_data' and 'meta' are both sample ids.")
-
-                    # self.meta=meta.loc[samples]"""
-                    self.expression_data=expression_data
-
-                    if self.expression_data.empty:
-                                            raise ValueError('Expression data is empty. Please check the input data.')
-                    
-                    #check condition column
-                    """if self.conCol not in self.meta.columns:
-                            raise ValueError(" Invalid conCol value. Could not find the column '%s' in meta DataFrame" % self.conCol)
-
-                    if set(self.meta[conCol].unique())!={0,1}:
-                            raise ValueError(" Invalid values in '%s' column in meta DataFrame. Please make sure to have condition column in the meta DataFrame with 0 as control and 1 as the condition (int)." % self.conCol)
-
-                    # split sample ids (cases and control)
-                    self.control= list( self.meta[self.meta[conCol]==0].index )
-                    self.case= list( self.meta[self.meta[conCol]==1].index )"""
-
                     # Check GRN and gene ids
                     #print("Checking genes")
                     GRN_genes = list(set(GRN.iloc[:, 0].values.tolist() + GRN.iloc[:, 1].values.tolist()))
-
-                    # Filter genes based on row indices in expression data
-                    """filtered_genes = []
-                    for g in GRN_genes:
-                        if g in self.expression_data.index:
-                            print(f"Gene found: {g}")
-                            filtered_genes.append(g)
-                        else:
-                            print(f"Gene not found in expression data: {g}")
-
-                    GRN_genes = filtered_genes"""
-                    #print("Genes in GRN_genes:", GRN_genes)
-                    #print("Genes in self.expression_data.index:", self.expression_data.columns)
-
                     GRN_genes=[g for g in GRN_genes if g in self.expression_data.columns]
 
                     # Raise error if no genes match
@@ -161,12 +117,10 @@ class run(object):
                     self.GRN=GRN[GRN.iloc[:,0].isin(GRN_genes) ]
                     self.GRN=self.GRN[ self.GRN.iloc[:,1].isin(GRN_genes) ].drop_duplicates()
 
+                    # excluding the process data function since we dont need it for model training
                     #self.cov_df,self.expr, self.control, self.case = functions.process_data(self)
-                    #self.cov_df,self.expr = functions.process_data(self)
 
-
-                    #self.results, self.model_stats = functions.dyregnet_model_old(self)
-                    self.model_stats = functions.dysregnet_model(self)
+                    self.results = functions.dysregnet_model(self)
                 
 
 

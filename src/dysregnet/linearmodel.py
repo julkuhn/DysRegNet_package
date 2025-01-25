@@ -23,7 +23,7 @@ class LinearModel:
         model = sm.OLS(y_train, x_train)
         results = model.fit()
 
-        # Speichere Ergebnisse
+        # Save Results
         self.params = results.params.values
         self.rsquared = results.rsquared
         self.pvalues = results.pvalues.values
@@ -31,7 +31,7 @@ class LinearModel:
 
     def predict(self, x_test):
         """
-        predicts based on the given parameters
+        predictions based on the given input
         """
         if self.params is None:
             raise ValueError("The model is not trained")

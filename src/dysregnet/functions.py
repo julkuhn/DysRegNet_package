@@ -114,6 +114,8 @@ def dyregnet_model(data):
 
         else : # grn is given
             control=data.expr.loc[data.control]
+            if len(control) > 3:
+                print("Warning: You have more than 3 control samples")
             case=data.expr.loc[data.case]  
         
         edges['patient id']=list(case.index.values)
@@ -123,8 +125,7 @@ def dyregnet_model(data):
         notfound = 0
         skipped = 0
         notskipped = 0
-        if len(control) > 3:
-            print("Warning: You have more than 3 control samples")
+        
     
         for tup in tqdm(data.GRN.itertuples(), desc="Processing edges"):
             edge = (tup[1], tup[2])  # Extract TF → target pair 

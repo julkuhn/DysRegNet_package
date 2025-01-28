@@ -123,6 +123,7 @@ def dyregnet_model(data):
         notfound = 0
         skipped = 0
         notskipped = 0
+        fit_analysis = {"residuals":[],"zscores":[],"pvalues":[],"combined":[]}
         if len(control) > 3:
             print("Warning: You have more than 3 control samples")
     
@@ -166,7 +167,10 @@ def dyregnet_model(data):
 
                         pvalues = stats.norm.sf(abs(z_scores))
                         _, combined_pvalue = combine_pvalues(pvalues, method='fisher')
-
+                        fit_analysis["residuals"].append(residuals)
+                        fit_analysis["zscores"].append(z_scores)
+                        fit_analysis["pvalues"].append(pvalues)
+                        fit_analysis["combined"].append(combined_pvalue)
                         # Identify significant deviations
                         significant = np.abs(z_scores) > 2
                         # skip model if too many significant deviations
@@ -246,11 +250,15 @@ def dyregnet_model(data):
             # Filter insignificant z-scores
             zscore[~valid] = 0.0
             edges[edge] = np.round(zscore, 1)
+            break
 
         if data.load_model: print("Ratio of found models: ",found / (notfound+found))
         if skipped + notskipped > 0:
             print("Skipped models: ", skipped / (skipped + notskipped) )
-     
+            _
+        #print("fit_analysis: ", fit_analysis)
+        with open("fit_lll.pkl", "wb") as file:
+            pickle.dump(fit_analysis, file)
         #results = pd.DataFrame.from_dict(edges) # TODO hier Fehler
         #if patient_id is not None:
         #results = results.set_index('patient id')
@@ -260,7 +268,7 @@ def dyregnet_model(data):
         if not edges:
             print("Edges dictionary is empty.")
             raise ValueError("Edges dictionary is empty. No data to process.")
-
+        print("edges: ", edges)
         # Convert to DataFrame
         try:
             results = pd.DataFrame.from_dict(edges)

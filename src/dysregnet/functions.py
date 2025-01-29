@@ -257,8 +257,10 @@ def dyregnet_model(data):
             print("Skipped models: ", skipped / (skipped + notskipped) )
             _
         #print("fit_analysis: ", fit_analysis)
+        """
         with open("fit_lll.pkl", "wb") as file:
             pickle.dump(fit_analysis, file)
+        """
         #results = pd.DataFrame.from_dict(edges) # TODO hier Fehler
         #if patient_id is not None:
         #results = results.set_index('patient id')

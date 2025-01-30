@@ -18,18 +18,15 @@ python setup.py install
 The inputs of the  package are the following Pandas DataFrame objects:
 
 - expression_data  - Gene expression matrix in the format: patients as rows (first column - patients/samples ids), and genes as columns.
-- GRN - Gene Regulatory Network (GRN) with two columns in the following order ['TF', 'target'].
-- meta -  Metadata with the first column containing patients/samples ids and other columns for the condition and the covariates.
+- GRN - either a String with the origin tissue of the expression_data (possible options:"breast", "lung") or a Gene Regulatory Network (GRN) with two columns in the following order ['TF', 'target'].
 
-The patients id or samples ids must be the same in the "expression_data" and  "meta". Additionally, gene names or ids must match the ones in the "GRN" DataFrame. 
-
-In the condition column of the meta DataFrame, the control samples should be encoded as 0 and case samples as 1.
-
-The gene regulatory network should be provided by the user. You can either use an experimental validated GRN or learn it from control samples. We recommend using software like [arboreto](https://github.com/aertslab/arboreto) since you can use its output directly to DysRegNet.
+The gene regulatory network can be provided by the user. You can either use an experimental validated GRN or learn it from control samples. We recommend using software like [arboreto](https://github.com/aertslab/arboreto) since you can use its output directly to DysRegNet. If less than 3 control samples a provided, DysRegNet will use the default GRN with already available models for the specified tissue, otherwise it will only take the similar models into account. 
 
 ## Parameters 
 Additionally, you can provide the following parameters:
 
+- meta -  Metadata with the first column containing patients/samples ids and other columns for the condition and the covariates. The metadata is necessary when providing a own GRN. 
+  
 - conCol: Column name for the condition in the meta DataFrame.
 
 - CatCov: List of categorical variable names. They should match the name of their columns in the meta Dataframe.
@@ -49,6 +46,8 @@ Additionally, you can provide the following parameters:
 - direction_condition:  If True, DysRegNet will only consider case samples with positive residuals (target gene overexpressed) for models with a negative TF coefficient as potentially dysregulated. Similarly, for positive TF coefficients, only case samples with negative residuals are considered. Please check the paper for more details.
 
 The parameters are also annotated with dockstrings for more details.
+The patients id or samples ids must be the same in the "expression_data" and  "meta". Additionally, gene names or ids must match the ones in the "GRN" DataFrame. 
+In the condition column of the meta DataFrame, the control samples should be encoded as 0 and case samples as 1.
 
 ## Get Started
 Import the package and pandas:
@@ -71,12 +70,9 @@ ConCov=['birth_days_to']
 
 Run DysRegNet
 ```python
+grn = "breast" # other option: "lung"
 data=dysregnet.run(expression_data=expr,
-                   meta=meta, 
                    GRN=grn,
-                   conCol=conCol,
-                   CatCov=CatCov,
-                   ConCov=ConCov,
                    direction_condition=True,
                    normaltest=True,
                    R2_threshold=.2)

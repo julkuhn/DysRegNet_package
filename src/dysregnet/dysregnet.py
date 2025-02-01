@@ -38,7 +38,9 @@ class run(object):
                         Gene names or IDs must match the ones in the GRN DataFrame.
 
                     GRN: pandas DataFrame 
-                        Gene Regulatory Network (GRN) with two columns in the following order ['TF', 'target'].
+                        Gene Regulatory Network (GRN) with two columns in the following order ['TF', 'target']
+                        or 
+                        Tissue Type as String
 
                     meta: pandas DataFrame, default: None
                         If provided it should contain: 
@@ -103,7 +105,7 @@ class run(object):
                         expression_data = expression_data.set_index(expression_data.columns[0])
 
 
-                        # check sample ids
+                        # check sample id
                         samples=[ s for s in  list(meta.index) if s in list(expression_data.index) ]
                         if not samples:
                             raise ValueError("Sample columns are not found or the ids don't match. Please make sure that the first column in 'expression_data' and 'meta' are both sample ids.")
@@ -116,8 +118,6 @@ class run(object):
                         if self.conCol not in self.meta.columns:
                                 raise ValueError(" Invalid conCol value. Could not find the column '%s' in meta DataFrame" % self.conCol)
 
-                        if set(self.meta[conCol].unique())!={0,1}:
-                                raise ValueError(" Invalid values in '%s' column in meta DataFrame. Please make sure to have condition column in the meta DataFrame with 0 as control and 1 as the condition (int)." % self.conCol)
 
                         # split sample ids (cases and control)
                         self.control= list( self.meta[self.meta[conCol]==0].index)

@@ -149,7 +149,7 @@ def dyregnet_model(data):
 
                 # check if no control samples >3
                 if control is not None:
-                    if len(control) > 3:
+                    if len(control) < 4:
                         control=data.expr.loc[data.control]
                         case=data.expr.loc[data.case]  
                         # check if trained models fit control data, use only these and ignore others

@@ -28,7 +28,8 @@ class run(object):
                      R2_threshold=None,
                      normaltest=False,
                      normaltest_alpha=1e-3,
-                     direction_condition=False):
+                     direction_condition=False,
+                     skip_poor_fits= False):
                     """
                     Raw data processing for further analysis
 
@@ -81,6 +82,9 @@ class run(object):
                     direction_condition: boolean, default: False
                          If True, DysRegNet will only consider case samples with positive residuals (target gene overexpressed) for models with a negative TF coefficient
                          as potentially dysregulated. Similarly, for positive TF coefficients, only case samples with negative residuals are considered. Please check the paper for more details.
+                    
+                    skip_poor_fits: boolean, default False
+                        If true and no GRN is given, the edges aka models where its combined P-value < 0.05 (over the residuals of the control data) will not be used for the output.
                     """
 
 
@@ -95,7 +99,7 @@ class run(object):
                     self.normaltest=normaltest
                     self.normaltest_alpha=normaltest_alpha
                     self.direction_condition=direction_condition
-
+                    self.skip_poor_fits=skip_poor_fits
 
                     # quality check of parameters
 
@@ -183,19 +187,6 @@ class run(object):
                         else:
                             raise ValueError("Invalid GRN value. Please provide a valid GRN file or a tissue name.")
                         
-                        """
-                        self.load_model = True
-                        if GRN == 'lung': # TODO hier auch checken, ob die ids matchen?
-                            # load model
-                            self.GRN = pd.read_csv("GENIE3_output/linkedList_output_slurm_gene_tpm_v10_lung_filtered.csv")
-                            # TODO grn genes etC? 
-                        elif GRN == 'breast':
-                            # load model
-                            self.GRN = pd.read_csv("GENIE3_output/linkedList_output_slurm_gene_tpm_v10_breast_mammary_tissu_filtered.csv")
-                        else:
-                            raise ValueError("Invalid GRN value. Please provide a valid GRN file or a tissue name.")
-                        self.model_dir = f"pickle_models_{GRN}"
-                        """
                     elif type(GRN) == pd.DataFrame:
                             self.load_model = False
                             self.GRN = GRN

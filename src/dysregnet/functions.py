@@ -105,6 +105,7 @@ def dyregnet_model(data):
         if data.cov_df is not None:
             control=pd.merge(data.cov_df.loc[data.control],data.expr, left_index=True, right_index=True).drop_duplicates()
             case = pd.merge(data.cov_df.loc[data.case], data.expr, left_index=True, right_index=True).drop_duplicates()
+            print("cov_df: ", data.cov_df)
             covariate_name = list(data.cov_df.columns)
             edges['patient id']=list(case.index.values)
 
@@ -121,7 +122,7 @@ def dyregnet_model(data):
                 print("Warning: You have more than 3 control samples")
             case=data.expr.loc[data.case]  
             edges['patient id']=list(case.index.values)
-            
+
         model_stats = {}
                          
         found = 0
@@ -151,7 +152,7 @@ def dyregnet_model(data):
                     continue
 
                 # check if no control samples >3
-                if control is not None:
+                if control is not None and data.skip_poor_fits:
                     if len(control) < 6 and len(control)>1:
                         control=data.expr.loc[data.control]
                         case=data.expr.loc[data.case]  
@@ -232,15 +233,7 @@ def dyregnet_model(data):
         if data.load_model: print("Ratio of found models: ",found / (notfound+found))
         if skipped + notskipped > 0:
             print("Skipped models: ", skipped / (skipped + notskipped) )
-     
-        #results = pd.DataFrame.from_dict(edges) # TODO hier Fehler
-        #if patient_id is not None:
-        #results = results.set_index('patient id')
-        print("Debugging...")
-        for key, value in edges.items():
-            print(f"{key}: {len(value)}")
-
-        max_length = max(len(v) for v in edges.values())
+         
         if not edges:
             print("Edges dictionary is empty.")
             raise ValueError("Edges dictionary is empty. No data to process.")

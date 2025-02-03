@@ -106,19 +106,22 @@ def dyregnet_model(data):
             control=pd.merge(data.cov_df.loc[data.control],data.expr, left_index=True, right_index=True).drop_duplicates()
             case = pd.merge(data.cov_df.loc[data.case], data.expr, left_index=True, right_index=True).drop_duplicates()
             covariate_name = list(data.cov_df.columns)
+            edges['patient id']=list(case.index.values)
+
         
         elif data.load_model: 
             control = data.control
-            case = data.expr
+            case = data.case
             covariate_name = []
+            edges['patient id']=case
 
         else : # grn is given
             control=data.expr.loc[data.control]
             if len(control) > 3:
                 print("Warning: You have more than 3 control samples")
             case=data.expr.loc[data.case]  
-        
-        edges['patient id']=list(case.index.values)
+            edges['patient id']=list(case.index.values)
+            
         model_stats = {}
                          
         found = 0
@@ -149,12 +152,10 @@ def dyregnet_model(data):
 
                 # check if no control samples >3
                 if control is not None:
-                    if len(control) < 4:
+                    if len(control) < 6 and len(control)>1:
                         control=data.expr.loc[data.control]
                         case=data.expr.loc[data.case]  
                         # check if trained models fit control data, use only these and ignore others
-                        # print('Only 3 control samples, using only these for the model')
-                        # prepare control for fitting model TODO correct?
                         
                         x_train = control[  [edge[0]] + covariate_name ]
                         x_train = sm.add_constant(x_train, has_constant='add') # add bias
@@ -168,8 +169,6 @@ def dyregnet_model(data):
                         pvalues = stats.norm.sf(abs(z_scores))
                         _, combined_pvalue = combine_pvalues(pvalues, method='fisher')
 
-                        # Identify significant deviations
-                        significant = np.abs(z_scores) > 2
                         # skip model if too many significant deviations
                         alpha = 0.05
                         if combined_pvalue < alpha:
@@ -220,25 +219,7 @@ def dyregnet_model(data):
 
             # Z-score calculation (assuming a standard normal distribution for residuals)
             zscore = resid_case / resid_case.std()
-            """
-            residuals = y_train - results.predict(x_train)
-            mean_residual = np.mean(residuals)
-            std_residual = np.std(residuals)
-            z_scores = (residuals - mean_residual) / std_residual
 
-            pvalues = stats.norm.sf(abs(z_scores))
-            combined_pvalue, _ = combine_pvalues(pvalues, method='fisher')
-
-            # Identify significant deviations
-            significant = np.abs(z_scores) > 2
-            # skip model if too many significant deviations
-            alpha = 0.05
-            if combined_pvalue < alpha:
-                #print("Warning: Too many significant deviations. Skipping model.")
-                skipped +=1
-                continue
-            notskipped += 1
-            """
             # Convert z-scores to p-values and apply multiple testing correction
             pvalues = stats.norm.sf(abs(zscore)) * sides
             pvalues = sm.stats.multipletests(pvalues, method='bonferroni', alpha=data.bonferroni_alpha)[1]
@@ -255,7 +236,9 @@ def dyregnet_model(data):
         #results = pd.DataFrame.from_dict(edges) # TODO hier Fehler
         #if patient_id is not None:
         #results = results.set_index('patient id')
-    
+        print("Debugging...")
+        for key, value in edges.items():
+            print(f"{key}: {len(value)}")
 
         max_length = max(len(v) for v in edges.values())
         if not edges:

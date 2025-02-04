@@ -113,6 +113,9 @@ def dyregnet_model(data):
         elif data.load_model: 
             control = data.control
             case = data.case
+            #
+            control=data.expr.loc[data.control]
+            case=data.expr.loc[data.case]  
             covariate_name = []
             edges['patient id']=case
 
@@ -154,14 +157,19 @@ def dyregnet_model(data):
                 # check if no control samples >3
                 if control is not None and data.skip_poor_fits:
                     if len(control) < 6 and len(control)>1:
-                        control=data.expr.loc[data.control]
-                        case=data.expr.loc[data.case]  
+                        #control=data.expr.loc[data.control]
+                        #case=data.expr.loc[data.case]  
                         # check if trained models fit control data, use only these and ignore others
-                        
                         x_train = control[  [edge[0]] + covariate_name ]
                         x_train = sm.add_constant(x_train, has_constant='add') # add bias
                         y_train = control[edge[1]].values
-
+                        
+                        # TODO: investigate further. This should not be needed 
+                        if data.cov_df is not None:
+                            x_train = x_train[x_train[covariate_name[0]] == 1]
+                            y_train = y_train[x_train[covariate_name[0]].to_numpy()]
+                            x_train = x_train.drop(columns=[covariate_name[0]])
+                        
                         residuals = y_train - results.predict(x_train)
                         mean_residual = np.mean(residuals)
                         std_residual = np.std(residuals)
@@ -200,6 +208,12 @@ def dyregnet_model(data):
             x_test = sm.add_constant(x_test, has_constant='add')  # Add intercept
             y_test = case[edge[1]].values
 
+            # TODO: investigate further. This should not be needed 
+            if data.cov_df is not None:
+                x_test = x_test[x_test[covariate_name[0]] == 0]
+                y_test = y_test[x_test[covariate_name[0]].to_numpy()]
+                x_test = x_test.drop(columns=[covariate_name[0]])
+                        
             # Predict target gene expression for case samples
             y_pred = results.predict(x_test)
 

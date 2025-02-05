@@ -14,6 +14,7 @@ import os
 from itertools import product
 from scipy.stats import combine_pvalues
 from .linearmodel import LinearModel
+
 #_____________
 
 def process_data(data):
@@ -27,10 +28,6 @@ def process_data(data):
             all_covariates = None
 
         if not all_covariates or len(data.meta)==1:
-                #if len(data.control) > 3:
-                     #raise ValueError("You did not input any covariates in CatCov or ConCov parameters, but you have more than 3 control samples")
-                #else:
-                    # No covariate provided
                     print('You did not input any covariates in CatCov or ConCov parameters, proceeding without them.')
                     cov_df=None
 
@@ -86,185 +83,238 @@ def process_data(data):
             case = None
 
         return cov_df, expr, control, case
-    
-    
-    
+
+
+
 def dyregnet_model(data):
-        
-        # Fit a model for every edge
-        # Detect outliers and calculate zscore and pvalues
-        # correct for multiple testing 
-        
-        # prepare data
-        
-        #_______
-        
-        # Prepare case data
-        edges = {}
-
-        if data.cov_df is not None:
-            control=pd.merge(data.cov_df.loc[data.control],data.expr, left_index=True, right_index=True).drop_duplicates()
-            case = pd.merge(data.cov_df.loc[data.case], data.expr, left_index=True, right_index=True).drop_duplicates()
-            print("cov_df: ", data.cov_df)
-            covariate_name = list(data.cov_df.columns)
-            edges['patient id']=list(case.index.values)
-
-        
-        elif data.load_model: 
-            control = data.control
-            case = data.case
-            #
-            control=data.expr.loc[data.control]
-            case=data.expr.loc[data.case]  
-            covariate_name = []
-            edges['patient id']=case
-
-        else : # grn is given
-            control=data.expr.loc[data.control]
-            if len(control) > 3:
-                print("Warning: You have more than 3 control samples")
-            case=data.expr.loc[data.case]  
-            edges['patient id']=list(case.index.values)
-
-        model_stats = {}
-                         
-        found = 0
-        notfound = 0
-        skipped = 0
-        notskipped = 0
-        
+    """
+    For every edge (TF -> target) the function either loads a pre-fitted model or fits a new OLS model
+    using the control samples. If control samples are provided, it fits a 
+    model on the control samples and compares it to the loaded model. Only if the coefficients 
+    are sufficiently similar (i.e. their absolute differences are all below a specified threshold) does it
+    proceed with testing on the case samples.
     
-        for tup in tqdm(data.GRN.itertuples(), desc="Processing edges"):
-            edge = (tup[1], tup[2])  # Extract TF → target pair 
+    Parameters:
+      data: an object (or namespace) with the following attributes:
+         - expr: DataFrame of gene expression values (samples x genes)
+         - cov_df: (optional) DataFrame with covariate information (samples x covariates)
+         - control, case: indexers for control and case samples
+         - GRN: DataFrame (or similar) of edges (each row with TF and target)
+         - load_model: boolean, whether to load pre-computed models from file
+         - model_dir: directory where models are stored (if load_model is True)
+         - skip_poor_fits: boolean, if True perform extra checks on the control model fit
+         - direction_condition: boolean, if True use one-sided p-values based on the sign of the TF coefficient
+         - bonferroni_alpha: significance level for multiple testing correction
+         - similarity_threshold: maximum allowed absolute difference between coefficients of the two models.
+    
+    Returns:
+      results_df: DataFrame with z-scores (one row per case sample) for each edge that passed the checks
+     
+    """
+    case_flag = True
 
-            # Skip self-loops
-            if edge[0] == edge[1]:
+    # Prepare data: merge covariates if provided
+    if data.cov_df is not None:
+        control = pd.merge(data.cov_df.loc[data.control], data.expr, left_index=True, right_index=True).drop_duplicates()
+        case = pd.merge(data.cov_df.loc[data.case], data.expr, left_index=True, right_index=True).drop_duplicates()
+        covariate_name = list(data.cov_df.columns)
+
+    elif data.load_model:
+        if data.case is None:
+            case_flag = False
+            control = data.control
+            case = data.expr
+        else: 
+            control = data.expr.loc[data.control]
+            case = data.expr.loc[data.case]
+        covariate_name = []
+    else:  # When GRN is provided but no covariates
+        control = data.expr.loc[data.control]
+        if len(control) > 3:
+            print("Warning: You have more than 3 control samples")
+        case = data.expr.loc[data.case]
+
+    # The dictionary "edges" will store z-scores for each edge.
+    edges = {}
+    edges['patient id'] = case.index.tolist()
+    model_stats = {}  # To collect model stats per edge
+
+    found = 0
+    notfound = 0
+    skipped = 0
+    notskipped = 0
+
+    # Loop over every edge (TF -> target)
+    for tup in tqdm(data.GRN.itertuples(), desc="Processing edges"):
+        edge = (tup[1], tup[2])
+        # Skip self-loops
+        if edge[0] == edge[1]:
+            continue
+
+        # Initialize "results" to hold the model we will use.
+        results = None
+
+        # ===============================================================
+        # CASE 1: A pre-existing model is available (data.load_model == True)
+        # ===============================================================
+        if data.load_model:
+            filename = os.path.join(data.model_dir, f"{edge[0]}_{edge[1]}.pkl")
+            try:
+                loaded_results = LinearModel.load(filename)
+                found += 1
+            except FileNotFoundError:
+                #print(f"Model file not found for edge {edge}. Skipping.")
+                notfound += 1
                 continue
 
-            if data.load_model:
-                # print("Loading model for edge: ", edge)
-                filename = os.path.join(data.model_dir, f"{edge[0]}_{edge[1]}.pkl")
-                # print("Filename: ", filename)
-                try:
-                    results = LinearModel.load(filename)
-                    found +=1
+            # If control samples are available and you wish to check the model’s quality,
+            # then also fit a model using the control data and compare it to the loaded model.
+            if control is not None:
+                if len(control) > 3 and case_flag:
+                    # -----------------------------------------------
+                    # (A) Fit the control model using the control data.
+                    # -----------------------------------------------
+                    x_train_control = control[[edge[0]] + covariate_name]
+                    x_train_control = sm.add_constant(x_train_control, has_constant='add')
+                    y_train_control = control[edge[1]].values
+                    #model = LinearModel(predictors=[edge[0]] + covariate_name, target=edge[1])
+                    #results_control = model.train(x_train_control, y_train_control)
+                    model = sm.OLS(y_train_control, x_train_control)
+                    results_control = model.fit()
+                    #results_control = model_control.fit()
 
-                except FileNotFoundError:
-                    print(f"Model file not found for edge {edge}. Skipping.")
-                    notfound +=1
-                    continue
+                    # Compute residuals for the control model:
+                    residuals_control = y_train_control - results_control.predict(x_train_control)
+                    mean_res_control = np.mean(residuals_control)
+                    std_res_control = np.std(residuals_control)
+                    if std_res_control == 0:
+                        std_res_control = 1e-6  # safeguard against division by zero
+                    # Calculate z-scores and then p-values for the control model:
+                    z_scores_control = (residuals_control - mean_res_control) / std_res_control
+                    pvalues_control = stats.norm.sf(np.abs(z_scores_control))
+                    # Combine the p-values (using Fisher's method, for example)
+                    _, combined_pvalue_control = combine_pvalues(pvalues_control, method='fisher')
 
-                # check if no control samples >3
-                if control is not None and data.skip_poor_fits:
-                    if len(control) < 6 and len(control)>1:
-                        #control=data.expr.loc[data.control]
-                        #case=data.expr.loc[data.case]  
-                        # check if trained models fit control data, use only these and ignore others
-                        x_train = control[  [edge[0]] + covariate_name ]
-                        x_train = sm.add_constant(x_train, has_constant='add') # add bias
-                        y_train = control[edge[1]].values
-                        
-                        # TODO: investigate further. This should not be needed 
-                        if data.cov_df is not None:
-                            x_train = x_train[x_train[covariate_name[0]] == 1]
-                            y_train = y_train[x_train[covariate_name[0]].to_numpy()]
-                            x_train = x_train.drop(columns=[covariate_name[0]])
-                        
-                        residuals = y_train - results.predict(x_train)
-                        mean_residual = np.mean(residuals)
-                        std_residual = np.std(residuals)
-                        z_scores = (residuals - mean_residual) / std_residual
+                    # -----------------------------------------------
+                    # (B) Evaluate the loaded model on the same control data.
+                    # -----------------------------------------------
+                    # Now predict using the loaded model.
+                    x_train_control_reduced = x_train_control[['const', edge[0]]]
+                    y_pred_loaded = loaded_results.predict(x_train_control_reduced)
+                    #y_pred_loaded = loaded_results.predict(x_train_control)
+                    residuals_loaded = y_train_control - y_pred_loaded
+                    mean_res_loaded = np.mean(residuals_loaded)
+                    std_res_loaded = np.std(residuals_loaded)
+                    if std_res_loaded == 0:
+                        std_res_loaded = 1e-6
+                    z_scores_loaded = (residuals_loaded - mean_res_loaded) / std_res_loaded
+                    pvalues_loaded = stats.norm.sf(np.abs(z_scores_loaded))
+                    _, combined_pvalue_loaded = combine_pvalues(pvalues_loaded, method='fisher')
 
-                        pvalues = stats.norm.sf(abs(z_scores))
-                        _, combined_pvalue = combine_pvalues(pvalues, method='fisher')
 
-                        # skip model if too many significant deviations
-                        alpha = 0.05
-                        if combined_pvalue < alpha:
-                            #print("Warning: Too many significant deviations. Skipping model.")
-                            skipped +=1
-                            continue
+                    # -----------------------------------------------
+                    # (C) Compare the two models on control data.
+                    # -----------------------------------------------
+                    # Here we compare the combined p-values. The logic is: if the difference
+                    # between the loaded model's combined p-value and the control model's combined
+                    # p-value is larger than a threshold, then the loaded model may not be describing
+                    # the control data well.
+                    diff = np.abs(combined_pvalue_loaded - combined_pvalue_control)
+                    if diff < 0.05:
+                        # The difference is too high: the loaded model doesn't match the control data well.
+                        skipped += 1
+                        results = loaded_results
+                        continue
+                    else:
                         notskipped += 1
-                
+                        # Accept the control model.
+                        results = results_control
             else: 
-                x_train = control[  [edge[0]] + covariate_name ]
-                x_train = sm.add_constant(x_train, has_constant='add') # add bias
-                y_train = control[edge[1]].values
-
-                # fit the model
-                model = sm.OLS(y_train, x_train)
-                results = model.fit()
-
-          
-            # Save model stats
-            model_stats[edge] = [results.rsquared] + list(results.params) + list(results.pvalues)
-            
-            # get residuals of control
-            # TODO: remove the line? do we not need it for the zscore calculation?
-            # resid_control = y_train - results.predict(x_train) 
-
-            # Prepare design matrix for case samples
-            x_test = case[[edge[0]] + covariate_name]
-            x_test = sm.add_constant(x_test, has_constant='add')  # Add intercept
-            y_test = case[edge[1]].values
-
-            # TODO: investigate further. This should not be needed 
-            if data.cov_df is not None:
-                x_test = x_test[x_test[covariate_name[0]] == 0]
-                y_test = y_test[x_test[covariate_name[0]].to_numpy()]
-                x_test = x_test.drop(columns=[covariate_name[0]])
-                        
-            # Predict target gene expression for case samples
-            y_pred = results.predict(x_test)
-
-            # Residuals for case samples
-            resid_case = y_test - y_pred
-
-            # Directional condition (if applicable)
-            cond = True
-            if data.load_model: 
-                direction = np.sign(results.params[1]) # Direction of TF influence
-            else:
-                direction = np.sign(results.params.iloc[1])
-            sides = 2  # Default: two-sided p-value
-
-            if data.direction_condition:
-                cond = (direction * resid_case) < 0
-                sides = 1  # One-sided p-value
-
-            # Z-score calculation (assuming a standard normal distribution for residuals)
-            zscore = resid_case / resid_case.std()
-
-            # Convert z-scores to p-values and apply multiple testing correction
-            pvalues = stats.norm.sf(abs(zscore)) * sides
-            pvalues = sm.stats.multipletests(pvalues, method='bonferroni', alpha=data.bonferroni_alpha)[1]
-            valid = cond * (pvalues < data.bonferroni_alpha)
-
-            # Filter insignificant z-scores
-            zscore[~valid] = 0.0
-            edges[edge] = np.round(zscore, 1)
-
-        if data.load_model: print("Ratio of found models: ",found / (notfound+found))
-        if skipped + notskipped > 0:
-            print("Skipped models: ", skipped / (skipped + notskipped) )
-         
-        if not edges:
-            print("Edges dictionary is empty.")
-            raise ValueError("Edges dictionary is empty. No data to process.")
-
-        # Convert to DataFrame
-        try:
-            results = pd.DataFrame.from_dict(edges)
-            results = results.set_index('patient id')
-        except ValueError as e:
-            print("Error creating DataFrame from edges:", e)
-            for key, value in edges.items():
-                print(f"{key}: {len(value)}")
-            raise
+                results = loaded_results
 
 
-        # Model stats DataFrame
-        model_stats_cols = ["R2"] + ["coef_" + coef for coef in ["intercept", "TF"] + covariate_name] + \
-                        ["pval_" + coef for coef in ["intercept", "TF"] + covariate_name]
-        model_stats = pd.DataFrame([model_stats[edge] for edge in results.columns], index=results.columns, columns=model_stats_cols)
-        return results, model_stats
+        # ===============================================================
+        # CASE 2: No pre-existing model; fit the model using control samples.
+        # ===============================================================
+        else:
+            x_train = control[[edge[0]] + covariate_name]
+            x_train = sm.add_constant(x_train, has_constant='add')
+            y_train = control[edge[1]].values
+            model = sm.OLS(y_train, x_train)
+            results = model.fit()
+
+        # -----------------------------------------------------------
+        # Process the case samples with the (loaded or fitted) model.
+        # -----------------------------------------------------------
+        # Process the case samples with the (loaded or fitted) model.
+        x_test = case[[edge[0]] + covariate_name]
+        x_test = sm.add_constant(x_test, has_constant='add')
+        y_test = case[edge[1]].values
+
+
+        # Predict on case samples and calculate residuals
+        y_pred = results.predict(x_test)
+        resid_case = y_test - y_pred
+
+        # Determine the directional condition 
+        if hasattr(results.params, 'iloc'):
+            direction = np.sign(results.params.iloc[1])
+        else:
+            direction = np.sign(results.params[1])
+
+        sides = 2  # default two-sided p-value
+        cond = True
+        if data.direction_condition:
+            cond = (direction * resid_case) < 0
+            sides = 1  # use one-sided p-values
+
+        # Compute z-scores (avoid division by zero)
+        if np.std(resid_case) == 0:
+            zscore = np.zeros_like(resid_case)
+        else:
+            zscore = resid_case / np.std(resid_case)
+
+        # Convert z-scores to p-values and correct for multiple testing (Bonferroni)
+        pvals = stats.norm.sf(np.abs(zscore)) * sides
+        _, pvals_corrected, _, _ = sm.stats.multipletests(pvals, method='bonferroni', alpha=data.bonferroni_alpha)
+        valid = (pvals_corrected < data.bonferroni_alpha) & cond
+
+        # Set insignificant z-scores to zero.
+        zscore[~valid] = 0.0
+
+        # Store the rounded z-scores for this edge.
+        edges[edge] = np.round(zscore, 1)
+
+
+    # Print some summary statistics.
+    if data.load_model:
+        total = found + notfound
+        print("Ratio of found models: ", found / total if total > 0 else "N/A")
+    if (skipped + notskipped) > 0:
+        print("Skipped models ratio: ", skipped / (skipped + notskipped))
+
+    if not edges:
+        print("Edges dictionary is empty.")
+        raise ValueError("Edges dictionary is empty. No data to process.")
+
+    # Convert the edges dictionary into a DataFrame.
+    try:
+        results_df = pd.DataFrame.from_dict(edges)
+        results_df = results_df.set_index('patient id')
+    except ValueError as e:
+        print("Error creating DataFrame from edges:", e)
+        for key, value in edges.items():
+            print(f"{key}: {len(value)}")
+        raise
+
+    """# Prepare model statistics DataFrame.
+    model_stats_cols = (["R2"] + 
+                        ["coef_" + coef for coef in ["intercept", "TF"] + covariate_name] +
+                        ["pval_" + coef for coef in ["intercept", "TF"] + covariate_name])
+    model_stats_df = pd.DataFrame(
+        [model_stats[edge] for edge in results_df.columns],
+        index=results_df.columns,
+        columns=model_stats_cols
+    )"""
+
+    return results_df #, model_stats_df

@@ -28,8 +28,7 @@ class run(object):
                      R2_threshold=None,
                      normaltest=False,
                      normaltest_alpha=1e-3,
-                     direction_condition=False,
-                     skip_poor_fits= False):
+                     direction_condition=False):
                     """
                     Raw data processing for further analysis
 
@@ -83,8 +82,6 @@ class run(object):
                          If True, DysRegNet will only consider case samples with positive residuals (target gene overexpressed) for models with a negative TF coefficient
                          as potentially dysregulated. Similarly, for positive TF coefficients, only case samples with negative residuals are considered. Please check the paper for more details.
                     
-                    skip_poor_fits: boolean, default False
-                        If true and no GRN is given, the edges aka models where its combined P-value < 0.05 (over the residuals of the control data) will not be used for the output.
                     """
 
 
@@ -99,8 +96,7 @@ class run(object):
                     self.normaltest=normaltest
                     self.normaltest_alpha=normaltest_alpha
                     self.direction_condition=direction_condition
-                    self.skip_poor_fits=skip_poor_fits
-
+                
                     # quality check of parameters
 
                     # set sample as indexes
@@ -138,13 +134,6 @@ class run(object):
 
                     
                      #___________________________________________
-                    """
-                    TODO s: 
-                        - no confounder can be provided → what happens?
-                        - simple version: not allowed to include meta, only case no confounderes → no need for meta file
-                        - flag to skip models that dont fit or set a cut off ? change zscore cutoff?
-                        - loading GRN like this ideal? 
-                    """
 
                     if type(GRN) == str:
                         self.load_model = True
@@ -172,7 +161,6 @@ class run(object):
                                 self.download_file(grn_url, grn_filepath)
 
                             # Check if the ZIP file is already extracted
-                            #if not os.path.exists(f"{model_folder}/{GRN}"):
                             print(f"Extracting {GRN} model ZIP...")
                             self.extract_zip(zip_filepath, model_folder)
 
@@ -188,11 +176,12 @@ class run(object):
                             raise ValueError("Invalid GRN value. Please provide a valid GRN file or a tissue name.")
                         
                     elif type(GRN) == pd.DataFrame:
+                            print("GRN DataFrame provided.")
                             self.load_model = False
                             self.GRN = GRN
 
 
-                            # check GRN and gene ids
+                    # check GRN and gene ids
                     GRN_genes=list(set(self.GRN.iloc[:,0].values.tolist() + self.GRN.iloc[:,1].values.tolist()))
                     GRN_genes=[g for g in GRN_genes if g in expression_data.columns]
 
@@ -206,7 +195,7 @@ class run(object):
 
                     
                     self.cov_df,self.expr, self.control, self.case = functions.process_data(self)
-                    self.results, self.model_stats = functions.dyregnet_model(self)
+                    self.results = functions.dyregnet_model(self)
                 
 
                 
@@ -224,13 +213,12 @@ class run(object):
                 return res_binary
 
     
-        def get_model_stats(self):
-            return self.model_stats
+       # def get_model_stats(self):
+            #return self.model_stats
 
         
         
-        
-
+    
         @staticmethod
         def download_file(url, filepath):
             """

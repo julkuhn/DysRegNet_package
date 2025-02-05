@@ -23,21 +23,22 @@ class LinearModel:
         model = sm.OLS(y_train, x_train)
         results = model.fit()
 
-        # Speichere Ergebnisse
+        # Save results
         self.params = results.params.values
         self.rsquared = results.rsquared
         self.pvalues = results.pvalues.values
+
         return results
 
     def predict(self, x_test):
         """
-        predicts based on the given parameters
+        Predicts based on the given parameters.
         """
         if self.params is None:
             raise ValueError("The model is not trained")
-        
-        #x_test = sm.add_constant(x_test, has_constant='add')  # add intercept
+
         return np.dot(x_test, self.params)
+    
 
     def save(self, filename):
         """

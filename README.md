@@ -77,7 +77,7 @@ data=dysregnet.run(expression_data=expr,
                    normaltest=True,
                    R2_threshold=.2)
 
-# get the patient-specific dysregulate networks
+# get the patient-specific dysregulated networks
 data.get_results()
 
 # or with binary edges
